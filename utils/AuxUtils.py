@@ -1,0 +1,141 @@
+import os
+import math
+import numpy as np
+import pandas as pd
+from typing import List, Dict, Tuple, Sequence
+import torch
+from torch import optim, nn
+from torch.nn import functional as F
+
+
+def get_index(index_path: str, fold: List[int]) -> List[str]:
+    index_df = pd.read_csv(index_path, index_col=0)
+    index = []
+    for f in fold:
+        index.extend(index_df.loc[f, "index"].strip().split(" "))
+    return index
+
+
+def get_learning_rate(optimizer: optim.Optimizer) -> float:
+    lr = []
+    for param_group in optimizer.param_groups:
+        lr.append(param_group['lr'])
+
+    assert len(lr) == 1, "Get Learning Rate More Than 1"
+    lr = lr[0]
+
+    return lr
+
+
+def set_ckpy_dir(ckpt_dir: str, log_file: str) -> str:
+    ckpt_dir = os.path.join(ckpt_dir, log_file)
+    if not os.path.exists(ckpt_dir):
+        os.makedirs(ckpt_dir)
+    return ckpt_dir
+
+
+def save_weight(ckpt_dir: str, epoch: int, model_state_dict: Dict[str, float], optim_state_dict: Dict[str, float], sched_state_dict: Dict[str, float]):
+    checkpoint = {
+        "epoch": epoch,
+        "model_state_dict": model_state_dict,
+        "optim_state_dict": optim_state_dict,
+        "sched_state_dict": sched_state_dict
+    }
+    torch.save(checkpoint, ckpt_dir + '/model.pth')
+
+
+class AvgOutput(object):
+    def __init__(self) -> None:
+        self.sum = 0.
+        self.count = 0
+
+    def add(self, x: float) -> None:
+        self.sum += x
+        self.count += 1
+
+    def avg(self) -> float:
+        return self.sum / self.count
+
+    def clear(self) -> None:
+        self.sum = 0.
+        self.count = 0
+
+
+def _get_scan_interval(
+    image_size: Sequence[int], roi_size: Sequence[int], num_spatial_dims: int, overlap: float
+) -> Tuple[int, ...]:
+    """
+    Compute scan interval according to the image size, roi size and overlap.
+    Scan interval will be `int((1 - overlap) * roi_size)`, if interval is 0,
+    use 1 instead to make sure sliding window works.
+
+    """
+    if len(image_size) != num_spatial_dims:
+        raise ValueError("image coord different from spatial dims.")
+    if len(roi_size) != num_spatial_dims:
+        raise ValueError("roi coord different from spatial dims.")
+
+    scan_interval = []
+    for i in range(num_spatial_dims):
+        if roi_size[i] == image_size[i]:
+            scan_interval.append(int(roi_size[i]))
+        else:
+            interval = int(roi_size[i] * (1 - overlap))
+            scan_interval.append(interval if interval > 0 else 1)
+    return tuple(scan_interval)
+
+
+def sliding_window_inference(inputs: torch.Tensor, crop_size: Tuple[int],  model: nn.Module, outputs_size: Tuple[int], is_softmax: bool, overlap: float = 0.5) -> torch.Tensor:
+    num_spatial_dims = len(inputs.shape) - 2
+    if overlap < 0 or overlap >= 1:
+        raise ValueError("overlap must be >= 0 and < 1.")
+
+    # determine image spatial size and batch size
+    # Note: all input images must have the same image size and batch size
+    batch_size, _, *image_size_ = inputs.shape
+    image_size = tuple(max(image_size_[i], crop_size[i])
+                       for i in range(num_spatial_dims))
+    pad_size = []
+    for k in range(len(inputs.shape) - 1, 1, -1):
+        diff = max(crop_size[k - 2] - inputs.shape[k], 0)
+        half = diff // 2
+        pad_size.extend([half, diff - half])
+    inputs = F.pad(inputs, pad=pad_size, mode="constant", value=0.)
+
+    scan_interval = _get_scan_interval(
+        image_size, crop_size, num_spatial_dims, overlap)
+
+    scan_num = [math.ceil((image_size[i] - crop_size[i]) /
+                          scan_interval[i]) + 1 for i in range(num_spatial_dims)]
+    starts = []
+    for dim in range(num_spatial_dims):
+        dim_starts = []
+        for idx in range(scan_num[dim]):
+            start_idx = idx * scan_interval[dim]
+            start_idx -= max(start_idx + crop_size[dim] - image_size[dim], 0)
+            dim_starts.append(start_idx)
+        starts.append(dim_starts)
+    out = np.asarray([x.flatten()
+                     for x in np.meshgrid(*starts, indexing="ij")]).T
+    slices = [[slice(None), slice(None)]+[slice(s, s + crop_size[d])
+                                          for d, s in enumerate(x)] for x in out]
+    outputs = torch.zeros(outputs_size).to(inputs.device)
+    count = torch.zeros(outputs_size).to(inputs.device)
+
+    for slice_s in slices:
+        part_out = model(inputs[slice_s])
+        if is_softmax:
+            part_out = F.softmax(part_out, dim=1)
+        else:
+            part_out = torch.sigmoid(part_out)
+        outputs[slice_s] += part_out.clone()
+        count[slice_s] += 1
+
+    return outputs / count
+
+
+if __name__ == "__main__":
+    inputs = torch.ones((1, 3, 54, 300, 320))
+    outputs = torch.zeros(((1, 4, 54, 300, 320)))
+    roi = (32, 224, 224)
+    print(sliding_window_inference(inputs, roi, 0.5, None, outputs.size()).shape)

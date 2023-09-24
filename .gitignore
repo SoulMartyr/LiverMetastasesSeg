@@ -1,0 +1,11 @@
+/data/*
+!data/generate_index.py
+/__pycache__/*
+/logs/*
+/checkpoints/*
+/scripts/*
+/models/__pycache__/*
+/models/nets/__pycache__/*
+/models/sync_batchnorm/__pycache__/*
+/utils/__pycache__/*
+/.vscode/*
