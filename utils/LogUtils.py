@@ -44,11 +44,7 @@ def log_init(log_dir: str, mode: str) -> logging.Logger:
     filehandler.setLevel(logging.INFO)
     filehandler.setFormatter(formatter)
 
-    streamhandler = logging.StreamHandler()
-    streamhandler.setLevel(logging.INFO)
-    streamhandler.setFormatter(formatter)
     logger.addHandler(filehandler)
-    logger.addHandler(streamhandler)
 
     return logger
 
