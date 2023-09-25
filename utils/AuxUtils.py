@@ -27,7 +27,7 @@ def get_learning_rate(optimizer: optim.Optimizer) -> float:
     return lr
 
 
-def set_ckpy_dir(ckpt_dir: str, log_file: str) -> str:
+def set_ckpt_dir(ckpt_dir: str, log_file: str) -> str:
     ckpt_dir = os.path.join(ckpt_dir, log_file)
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)

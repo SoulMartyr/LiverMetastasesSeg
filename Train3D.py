@@ -34,14 +34,16 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes, c
         else:
             channel_range = [i for i in range(0, num_classes)]
         for idx, channel in enumerate(channel_range):
-            tmp_dice = dice_with_binary(pred, mask, channel, thres[idx])
+            tmp_dice = dice_with_binary(
+                pred, mask, channel, is_softmax, thres[idx])
             total_dice[idx].add(tmp_dice)
-            bacth_info += "thres:{} Dice{:-4}: {} ".format(
-                thres[idx], idx, tmp_dice)
+            if not is_softmax:
+                bacth_info += "thres:{} ".format(thres[idx])
+            bacth_info += "Dice{}: {:.4f} ".format(idx, tmp_dice)
         logger_valid.info(bacth_info)
     total_info = "Mean: "
     for idx in range(0, num_classes):
-        total_info += "Dice{:-4}: {} ".format(idx, total_dice[idx-1].avg())
+        total_info += "Dice{}: {:.4f} ".format(idx, total_dice[idx].avg())
     logger_valid.info(total_info)
     model.train()
     return total_dice[-1].avg()
@@ -76,7 +78,7 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
             if img.size(1) != in_channels:
                 repeat_num = [in_channels if i ==
                               1 else 1 for i in range(img.dim())]
-                img, mask = img.repeat(repeat_num), mask.repeat(repeat_num)
+                img = img.repeat(repeat_num)
 
             pred = model(img)
 
@@ -135,7 +137,7 @@ if __name__ == "__main__":
         logger_train = log_init(log_dir, mode="train")
         logger_valid = log_init(log_dir, mode="valid")
         writer = SummaryWriter(log_dir=log_dir)
-        ckpt_dir = set_ckpy_dir(args.ckpt_dir, file_dir)
+        ckpt_dir = set_ckpt_dir(args.ckpt_dir, file_dir)
         logger_train.info("Init Success")
 
         # Dataset

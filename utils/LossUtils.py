@@ -135,14 +135,11 @@ def dice_with_norm_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channe
     return dice / B
 
 
-def dice_with_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int,  is_softmax: bool = False, threshold: float = 0.5) -> float:
+def dice_with_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int, is_softmax: bool = False, threshold: float = 0.5) -> float:
     # assert preds.size() == targets.size(), "the size of predict and target must be equal."
     if is_softmax:
         preds = softmax_binary_torch(preds)
     else:
-        preds = torch.sigmoid(preds)
-        preds = torch.clamp(preds, min=1e-7, max=1).to(torch.float32)
-
         preds[preds >= threshold] = 1
         preds[preds < threshold] = 0
 
@@ -162,7 +159,15 @@ def dice_with_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: in
     return dice / B
 
 
-def VOE(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int, threshold: float = 0.5) -> float:
+def VOE(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int, is_softmax: bool = False, threshold: float = 0.5) -> float:
+    if is_softmax:
+        preds = softmax_binary_torch(preds)
+    else:
+        preds = torch.sigmoid(preds)
+        preds = torch.clamp(preds, min=1e-7, max=1).to(torch.float32)
+
+        preds[preds >= threshold] = 1
+        preds[preds < threshold] = 0
 
     if threshold is not None:
         if preds.size(1) == 1:
