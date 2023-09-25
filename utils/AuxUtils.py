@@ -85,7 +85,58 @@ def _get_scan_interval(
     return tuple(scan_interval)
 
 
-def sliding_window_inference(inputs: torch.Tensor, crop_size: Tuple[int],  model: nn.Module, outputs_size: Tuple[int], is_softmax: bool, overlap: float = 0.5) -> torch.Tensor:
+def sliding_window_inference_2d(inputs: torch.Tensor, crop_size: Tuple[int],  model: nn.Module, outputs_size: Tuple[int], is_softmax: bool) -> torch.Tensor:
+    num_spatial_dims = len(inputs.shape) - 2
+
+    # determine image spatial size and batch size
+    # Note: all input images must have the same image size and batch size
+    batch_size, _, *image_size_ = inputs.shape
+
+    assert len(crop_size) == len(image_size_)
+    image_size = tuple(max(image_size_[i], crop_size[i])
+                       for i in range(num_spatial_dims))
+    pad_size = []
+    for k in range(len(inputs.shape) - 1, 1, -1):
+        diff = max(crop_size[k - 2] - inputs.shape[k], 0)
+        half = diff // 2
+        pad_size.extend([half, diff - half])
+    inputs = F.pad(inputs, pad=pad_size, mode="constant", value=0.)
+
+    scan_interval = _get_scan_interval(
+        image_size, crop_size, num_spatial_dims, 0)
+
+    scan_num = [math.ceil((image_size[i] - crop_size[i]) /
+                          scan_interval[i]) + 1 for i in range(num_spatial_dims)]
+    starts = []
+    for dim in range(num_spatial_dims):
+        dim_starts = []
+        for idx in range(scan_num[dim]):
+            start_idx = idx * scan_interval[dim]
+            start_idx -= max(start_idx + crop_size[dim] - image_size[dim], 0)
+            dim_starts.append(start_idx)
+        starts.append(dim_starts)
+    out = np.asarray([x.flatten()
+                     for x in np.meshgrid(*starts, indexing="ij")]).T
+    slices = [[slice(None), slice(None)]+[slice(s, s + crop_size[d])
+                                          for d, s in enumerate(x)] for x in out]
+    outputs = torch.zeros(outputs_size).to(inputs.device)
+    count = torch.zeros(outputs_size).to(inputs.device)
+
+    for slice_s in slices:
+        input_s = inputs[slice_s].squeeze(0).permute(1, 0, 2, 3)
+        part_out = model(input_s)
+        part_out = part_out.permute(1, 0, 2, 3).unsqueeze(0)
+        if is_softmax:
+            part_out = F.softmax(part_out, dim=1)
+        else:
+            part_out = torch.sigmoid(part_out)
+        outputs[slice_s] += part_out.clone()
+        count[slice_s] += 1
+
+    return outputs / count
+
+
+def sliding_window_inference_3d(inputs: torch.Tensor, crop_size: Tuple[int],  model: nn.Module, outputs_size: Tuple[int], is_softmax: bool, overlap: float = 0.5) -> torch.Tensor:
     num_spatial_dims = len(inputs.shape) - 2
     if overlap < 0 or overlap >= 1:
         raise ValueError("overlap must be >= 0 and < 1.")
@@ -93,6 +144,8 @@ def sliding_window_inference(inputs: torch.Tensor, crop_size: Tuple[int],  model
     # determine image spatial size and batch size
     # Note: all input images must have the same image size and batch size
     batch_size, _, *image_size_ = inputs.shape
+
+    assert len(crop_size) == len(image_size_)
     image_size = tuple(max(image_size_[i], crop_size[i])
                        for i in range(num_spatial_dims))
     pad_size = []
@@ -138,4 +191,5 @@ if __name__ == "__main__":
     inputs = torch.ones((1, 3, 54, 300, 320))
     outputs = torch.zeros(((1, 4, 54, 300, 320)))
     roi = (32, 224, 224)
-    print(sliding_window_inference(inputs, roi, 0.5, None, outputs.size()).shape)
+    print(sliding_window_inference_3d(
+        inputs, roi, 0.5, None, outputs.size()).shape)

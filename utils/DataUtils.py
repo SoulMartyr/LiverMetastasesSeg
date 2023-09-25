@@ -188,9 +188,13 @@ class Dataset2D(nn.Module):
         mask_array = ont_hot_mask_numpy(
             mask_array, num_classes=self.num_classes, is_softmax=self.is_softmax)
 
-        img_tensor = torch.FloatTensor(img_array.copy()).unsqueeze(1)
+        img_tensor = torch.FloatTensor(img_array.copy())
         mask_tensor = torch.FloatTensor(mask_array.copy())
-
+        if self.is_train:
+            img_tensor = img_tensor.unsqueeze(1)
+            mask_tensor = mask_tensor.permute(1, 0, 2, 3)
+        else:
+            img_tensor = img_tensor.unsqueeze(0)
         return {"index": self.index_list[index].split('.')[0], "img": img_tensor, "mask": mask_tensor}
 
 
@@ -228,10 +232,10 @@ class Dataset3D(nn.Module):
 
         img_array = sitk.GetArrayFromImage(img)
         mask_array = sitk.GetArrayFromImage(mask)
-        
+
         assert len(np.unique(
             mask_array).tolist()) == self.num_classes + 1, "numbers in mask dont equal to num classes"
-        
+
         if self.norm == "zscore":
             img_array = z_score_norm_3d_numpy(img_array, nonzero=True)
         elif self.norm == "minmax":

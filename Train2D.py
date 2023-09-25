@@ -11,7 +11,7 @@ from utils.DataUtils import *
 
 
 def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, in_channels: int, crop_size: Tuple[int], device: str,
-          is_softmax: bool, overlap: float, thres: List[float], logger_valid: logging.Logger) -> float:
+          is_softmax: bool, thres: List[float], logger_valid: logging.Logger) -> float:
     logger_valid.info("Epoch: {}".format(epoch))
     model.eval()
     total_dice = [AvgOutput() for _ in range(0, num_classes)]
@@ -26,8 +26,8 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: i
             img = img.repeat(repeat_num)
 
         with torch.no_grad():
-            pred = sliding_window_inference_3d(
-                img, crop_size, model, mask.size(), is_softmax, overlap)
+            pred = sliding_window_inference_2d(
+                img, crop_size, model, mask.size(), is_softmax)
 
         bacth_info = "index:{} ".format(index)
         if is_softmax:
@@ -75,6 +75,10 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
 
             img = batch['img'].to(device)
             mask = batch['mask'].to(device)
+
+            img_keep_dims, mask_keep_dims = img.size()[2:], mask.size()[2:]
+            img, mask = img.view(-1, *
+                                 img_keep_dims), mask.view(-1, *mask_keep_dims)
 
             if img.size(1) != in_channels:
                 repeat_num = [in_channels if i ==
@@ -151,8 +155,8 @@ if __name__ == "__main__":
         valid_dataset_args = {"data_path": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": valid_index, "is_train": False, "num_classes": args.num_classes,
                               "crop_size": (args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_flip": args.flip}
 
-        train_dataset = Dataset3D(**train_dataset_args)
-        valid_dataset = Dataset3D(**valid_dataset_args)
+        train_dataset = Dataset2D(**train_dataset_args)
+        valid_dataset = Dataset2D(**valid_dataset_args)
 
         train_dataloader_args = {"dataset": train_dataset, "batch_size": args.batch_size,
                                  "num_workers": args.num_workers, "drop_last": False, "pin_memory": True}
@@ -215,7 +219,7 @@ if __name__ == "__main__":
             thres = [args.thres1, args.thres2]
 
         valid_args = {"model": model, "device": device, "thres": thres, "valid_loader": valid_loader, "num_classes": args.num_classes, "in_channels": args.in_channels, "epoch": start_epoch,
-                      "crop_size": (args.roi_z, args.roi_y, args.roi_x), "logger_valid": logger_valid, "is_softmax": args.softmax, "overlap": args.overlap}
+                      "crop_size": (args.roi_z, args.roi_y, args.roi_x), "logger_valid": logger_valid, "is_softmax": args.softmax}
         train_args = {"model": model, "device": device, "thres": thres, "train_loader": train_loader, "optimizer": optimizer, "scheduler": scheduler, "in_channels": args.in_channels, "is_softmax": args.softmax, "epoch_num": args.epoch_num,
                       "start_epoch": start_epoch, "log_iter": args.log_iter, "valid_epoch": args.valid_epoch, "ckpt_dir": ckpt_dir, "logger_train": logger_train, "writer": writer, "valid_args": valid_args}
         best_result = train(**train_args)
