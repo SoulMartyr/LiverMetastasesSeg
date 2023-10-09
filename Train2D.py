@@ -3,14 +3,14 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 import Config
-import models
+from models import models_2d
 from utils.AuxUtils import *
 from utils.LossUtils import *
 from utils.LogUtils import *
 from utils.DataUtils import *
 
 
-def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, in_channels: int, crop_size: Tuple[int], device: str,
+def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, crop_size: Tuple[int], device: str,
           is_softmax: bool, thres: List[float], logger_valid: logging.Logger) -> float:
     logger_valid.info("Epoch: {}".format(epoch))
     model.eval()
@@ -19,11 +19,6 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: i
         index = batch["index"][0]
         img = batch['img'].to(device)
         mask = batch['mask'].to(device)
-
-        if img.size(1) != in_channels:
-            repeat_num = [in_channels if i ==
-                          1 else 1 for i in range(img.dim())]
-            img = img.repeat(repeat_num)
 
         with torch.no_grad():
             pred = sliding_window_inference_2d(
@@ -50,7 +45,7 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: i
     return total_dice[-1].avg()
 
 
-def train(model: nn.Module, device: str,  thres: List[float], train_loader: DataLoader,  optimizer: optim.Optimizer, scheduler: optim.lr_scheduler._LRScheduler,  in_channels: int, is_softmax: bool,
+def train(model: nn.Module, device: str,  thres: List[float], train_loader: DataLoader,  optimizer: optim.Optimizer, scheduler: optim.lr_scheduler._LRScheduler,  is_softmax: bool,
           epoch_num: int, start_epoch: int, log_iter: int, valid_epoch: int, ckpt_dir: str, logger_train: logging.Logger, writer: SummaryWriter, valid_args: dict):
     epoch = start_epoch
     best_result = 0.
@@ -80,11 +75,6 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
             img, mask = img.view(-1, *
                                  img_keep_dims), mask.view(-1, *mask_keep_dims)
 
-            if img.size(1) != in_channels:
-                repeat_num = [in_channels if i ==
-                              1 else 1 for i in range(img.dim())]
-                img = img.repeat(repeat_num)
-
             pred = model(img)
 
             loss_bce = bce_loss(pred, mask)
@@ -113,7 +103,7 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
                     "Train Epoch:{} Iteration:{} Learning rate:{:.4f} - BCE Loss:{:.4f}, Dice Loss:{:.4f}".format(
                         epoch, iteration, get_learning_rate(optimizer), bce_loss_iter.avg(), dice_loss_iter.avg()))
                 logger_train.info(
-                    "Threshold {} - Tumor Dice:{:.4f},".format(thres[-1], core_dice_iter.avg()))
+                    "Threshold {} - Core Dice:{:.4f},".format(thres[-1], core_dice_iter.avg()))
                 logger_train.info(
                     "--------------------------------------------------")
 
@@ -167,7 +157,7 @@ if __name__ == "__main__":
         valid_loader = DataLoader(**valid_dataloader_args)
         logger_train.info("Load DataSet Success")
 
-        model_maker = getattr(models, args.model)
+        model_maker = getattr(models_2d, args.model)
         if args.softmax:
             out_channels = args.num_classes + 1
         else:
@@ -218,9 +208,9 @@ if __name__ == "__main__":
         elif args.num_classes == 2:
             thres = [args.thres1, args.thres2]
 
-        valid_args = {"model": model, "device": device, "thres": thres, "valid_loader": valid_loader, "num_classes": args.num_classes, "in_channels": args.in_channels, "epoch": start_epoch,
+        valid_args = {"model": model, "device": device, "thres": thres, "valid_loader": valid_loader, "num_classes": args.num_classes, "epoch": start_epoch,
                       "crop_size": (args.roi_z, args.roi_y, args.roi_x), "logger_valid": logger_valid, "is_softmax": args.softmax}
-        train_args = {"model": model, "device": device, "thres": thres, "train_loader": train_loader, "optimizer": optimizer, "scheduler": scheduler, "in_channels": args.in_channels, "is_softmax": args.softmax, "epoch_num": args.epoch_num,
+        train_args = {"model": model, "device": device, "thres": thres, "train_loader": train_loader, "optimizer": optimizer, "scheduler": scheduler, "is_softmax": args.softmax, "epoch_num": args.epoch_num,
                       "start_epoch": start_epoch, "log_iter": args.log_iter, "valid_epoch": args.valid_epoch, "ckpt_dir": ckpt_dir, "logger_train": logger_train, "writer": writer, "valid_args": valid_args}
         best_result = train(**train_args)
         logger_valid.info("Best Dice: {}".format(str(best_result)))

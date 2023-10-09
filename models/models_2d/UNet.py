@@ -84,13 +84,13 @@ class Decoder(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, in_channel, n_class, channel_reduction=2, aux=False):
+    def __init__(self, in_channels, n_class, channel_reduction=2, aux=False):
         super().__init__()
         self.aux = aux
         channels = [64, 128, 256, 512, 1024]
         channels = [int(c / channel_reduction) for c in channels]
 
-        self.donv1 = DoubleConv(in_channel, channels[0])
+        self.donv1 = DoubleConv(in_channels, channels[0])
         self.donv2 = DoubleConv(channels[0], channels[1])
         self.donv3 = DoubleConv(channels[1], channels[2])
         self.donv4 = DoubleConv(channels[2], channels[3])
@@ -114,8 +114,6 @@ class UNet(nn.Module):
                 init_weights(m, init_type='kaiming')
 
     def forward(self, x):
-        outputs = dict()
-        size = x.size()[2:]
 
         x1 = self.donv1(x)  # 256
         x2 = self.donv2(self.down_pool(x1))  # 128
