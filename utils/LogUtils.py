@@ -26,13 +26,13 @@ def set_logdir(log_path: str, file_dir: str, is_lock: bool) -> str:
     return log_dir
 
 
-def log_init(log_dir: str, mode: str) -> logging.Logger:
-    logger = logging.getLogger('logger_{}'.format(mode))
+def log_init(log_dir: str, fold: int, mode: str) -> logging.Logger:
+    logger = logging.getLogger('logger_{}_fold{}'.format(mode, fold))
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(message)s')
 
     filehandler = logging.FileHandler(
-        os.path.join(log_dir, '{}.txt').format(mode))
+        os.path.join(log_dir, '{}.log').format(mode))
     filehandler.setLevel(logging.INFO)
     filehandler.setFormatter(formatter)
 

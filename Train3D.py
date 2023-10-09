@@ -1,3 +1,5 @@
+import sys
+
 from torch import optim, nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -15,28 +17,33 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: i
     logger_valid.info("Epoch: {}".format(epoch))
     model.eval()
     total_dice = [AvgOutput() for _ in range(0, num_classes)]
-    for _, batch in enumerate(valid_loader):
-        index = batch["index"][0]
-        img = batch['img'].to(device)
-        mask = batch['mask'].to(device)
+    try:
+        for _, batch in enumerate(valid_loader):
+            index = batch["index"][0]
+            img = batch['img'].to(device)
+            mask = batch['mask'].to(device)
 
-        with torch.no_grad():
-            pred = sliding_window_inference_3d(
-                img, crop_size, model, mask.size(), is_softmax, overlap)
+            with torch.no_grad():
+                pred = sliding_window_inference_3d(
+                    img, crop_size, model, mask.size(), is_softmax, overlap)
 
-        bacth_info = "index:{} ".format(index)
-        if is_softmax:
-            channel_range = [i for i in range(1, num_classes+1)]
-        else:
-            channel_range = [i for i in range(0, num_classes)]
-        for idx, channel in enumerate(channel_range):
-            tmp_dice = dice_with_binary(
-                pred, mask, channel, is_softmax, thres[idx])
-            total_dice[idx].add(tmp_dice)
-            if not is_softmax:
-                bacth_info += "thres:{} ".format(thres[idx])
-            bacth_info += "Dice{}: {:.4f} ".format(idx, tmp_dice)
-        logger_valid.info(bacth_info)
+            bacth_info = "index:{} ".format(index)
+            if is_softmax:
+                channel_range = [i for i in range(1, num_classes+1)]
+            else:
+                channel_range = [i for i in range(0, num_classes)]
+            for idx, channel in enumerate(channel_range):
+                tmp_dice = dice_with_binary(
+                    pred, mask, channel, is_softmax, thres[idx])
+                total_dice[idx].add(tmp_dice)
+                if not is_softmax:
+                    bacth_info += "thres:{} ".format(thres[idx])
+                bacth_info += "Dice{}: {:.4f} ".format(idx, tmp_dice)
+            logger_valid.info(bacth_info)
+    except Exception as e:
+        logger_valid.error(e, exc_info=True)
+        sys.exit()
+
     total_info = "Mean: "
     for idx in range(0, num_classes):
         total_info += "Dice{}: {:.4f} ".format(idx, total_dice[idx].avg())
@@ -49,68 +56,71 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
           epoch_num: int, start_epoch: int, log_iter: int, valid_epoch: int, ckpt_dir: str, logger_train: logging.Logger, writer: SummaryWriter, valid_args: dict):
     epoch = start_epoch
     best_result = 0.
+    try:
+        while epoch <= epoch_num:
 
-    while epoch <= epoch_num:
+            is_valid = False
 
-        is_valid = False
+            bce_loss_iter = AvgOutput()
+            dice_loss_iter = AvgOutput()
+            core_dice_iter = AvgOutput()
 
-        bce_loss_iter = AvgOutput()
-        dice_loss_iter = AvgOutput()
-        core_dice_iter = AvgOutput()
+            for iteration, batch in enumerate(train_loader):
+                if not is_valid and epoch % valid_epoch == 0 and epoch != start_epoch:
+                    valid_args["epoch"] = epoch
+                    valid_result = valid(**valid_args)
+                    if valid_result > best_result:
+                        save_weight(ckpt_dir, epoch, model.state_dict(
+                        ), optimizer.state_dict(), scheduler.state_dict())
+                        best_result = valid_result
+                    is_valid = True
 
-        for iteration, batch in enumerate(train_loader):
-            if not is_valid and epoch % valid_epoch == 0 and epoch != start_epoch:
-                valid_args["epoch"] = epoch
-                valid_result = valid(**valid_args)
-                if valid_result > best_result:
-                    save_weight(ckpt_dir, epoch, model.state_dict(
-                    ), optimizer.state_dict(), scheduler.state_dict())
-                    best_result = valid_result
-                is_valid = True
+                img = batch['img'].to(device)
+                mask = batch['mask'].to(device)
 
-            img = batch['img'].to(device)
-            mask = batch['mask'].to(device)
+                pred = model(img)
 
-            pred = model(img)
+                loss_bce = bce_loss(pred, mask)
 
-            loss_bce = bce_loss(pred, mask)
+                out_channels = pred.size(1)
+                if is_softmax:
+                    tgt_dice_channels = [i for i in range(1, out_channels)]
+                else:
+                    tgt_dice_channels = [i for i in range(out_channels)]
+                loss_dice = dice_loss(
+                    pred, mask, tgt_channels=tgt_dice_channels, is_softmax=is_softmax)
 
-            out_channels = pred.size(1)
-            if is_softmax:
-                tgt_dice_channels = [i for i in range(1, out_channels)]
-            else:
-                tgt_dice_channels = [i for i in range(out_channels)]
-            loss_dice = dice_loss(
-                pred, mask, tgt_channels=tgt_dice_channels, is_softmax=is_softmax)
+                train_loss = loss_bce + loss_dice
 
-            train_loss = loss_bce + loss_dice
+                optimizer.zero_grad()
+                train_loss.backward()
+                optimizer.step()
 
-            optimizer.zero_grad()
-            train_loss.backward()
-            optimizer.step()
+                bce_loss_iter.add(loss_bce.item())
+                dice_loss_iter.add(loss_dice.item())
+                core_dice_iter.add(dice_with_norm_binary(
+                    pred, mask, -1, threshold=thres[-1], is_softmax=is_softmax))
 
-            bce_loss_iter.add(loss_bce.item())
-            dice_loss_iter.add(loss_dice.item())
-            core_dice_iter.add(dice_with_norm_binary(
-                pred, mask, -1, threshold=thres[-1], is_softmax=is_softmax))
+                if iteration % log_iter == 0:
+                    logger_train.info(
+                        "Train Epoch:{} Iteration:{} Learning rate:{:.4f} - BCE Loss:{:.4f}, Dice Loss:{:.4f}".format(
+                            epoch, iteration, get_learning_rate(optimizer), bce_loss_iter.avg(), dice_loss_iter.avg()))
+                    logger_train.info(
+                        "Threshold {} - Core Dice:{:.4f},".format(thres[-1], core_dice_iter.avg()))
+                    logger_train.info(
+                        "--------------------------------------------------")
 
-            if iteration % log_iter == 0:
-                logger_train.info(
-                    "Train Epoch:{} Iteration:{} Learning rate:{:.4f} - BCE Loss:{:.4f}, Dice Loss:{:.4f}".format(
-                        epoch, iteration, get_learning_rate(optimizer), bce_loss_iter.avg(), dice_loss_iter.avg()))
-                logger_train.info(
-                    "Threshold {} - Core Dice:{:.4f},".format(thres[-1], core_dice_iter.avg()))
-                logger_train.info(
-                    "--------------------------------------------------")
+                    writer.add_scalar(tag="loss/train", scalar_value=train_loss.item(),
+                                      global_step=epoch * len(train_loader) + iteration)
 
-                writer.add_scalar(tag="loss/train", scalar_value=train_loss.item(),
-                                  global_step=epoch * len(train_loader) + iteration)
-
-                bce_loss_iter.clear()
-                dice_loss_iter.clear()
-                core_dice_iter.clear()
-        epoch += 1
-        scheduler.step()
+                    bce_loss_iter.clear()
+                    dice_loss_iter.clear()
+                    core_dice_iter.clear()
+            epoch += 1
+            scheduler.step()
+    except Exception as e:
+        logger_train.error(e, exc_info=True)
+        sys.exit()
 
     writer.close()
     return best_result
@@ -125,8 +135,9 @@ if __name__ == "__main__":
 
         log_dir = set_logdir(args.log_dir, file_dir, is_lock=args.lock)
         save_args(args, log_dir)
-        logger_train = log_init(log_dir, mode="train")
-        logger_valid = log_init(log_dir, mode="valid")
+        logger_train = log_init(log_dir, fold, mode="train")
+        logger_valid = log_init(log_dir, fold, mode="valid")
+        print(logger_train.handlers)
         writer = SummaryWriter(log_dir=log_dir)
         ckpt_dir = set_ckpt_dir(args.ckpt_dir, file_dir)
         logger_train.info("Init Success")
