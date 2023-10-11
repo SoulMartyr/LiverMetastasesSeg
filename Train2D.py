@@ -106,7 +106,7 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
 
                 if iteration % log_iter == 0:
                     logger_train.info(
-                        "Train Epoch:{} Iteration:{} Learning rate:{:.4f} - CE Loss:{:.4f}, Dice Loss:{:.4f}".format(
+                        "Train Epoch:{} Iteration:{} Learning rate:{:.5f} - CE Loss:{:.4f}, Dice Loss:{:.4f}".format(
                             epoch, iteration, get_learning_rate(optimizer), ce_loss_iter.avg(), dice_loss_iter.avg()))
                     logger_train.info(
                         "Threshold {} - Core Dice:{:.4f},".format(thres[-1], core_dice_iter.avg()))
@@ -202,11 +202,11 @@ if __name__ == "__main__":
                 optimizer, args.epochs + 10)
 
         if args.use_ckpt:
-            weight = torch.load(args.pre_ckpt_path)
-            start_epoch = weight['epoch']
-            model.load_state_dict(weight['model_state_dict'], strict=True)
-            optimizer.load_state_dict(weight['optim_state_dict'])
-            scheduler.load_state_dict(weight['sched_state_dict'])
+            ckpt = torch.load(args.pre_ckpt_path)
+            start_epoch = ckpt['epoch']
+            model.load_state_dict(ckpt['model_state_dict'], strict=True)
+            optimizer.load_state_dict(ckpt['optim_state_dict'])
+            scheduler.load_state_dict(ckpt['sched_state_dict'])
         else:
             start_epoch = 0
 
@@ -223,7 +223,7 @@ if __name__ == "__main__":
                 weight = torch.tensor([0.143, 0.857]).to(device)
 
         valid_args = {"model": model, "device": device, "thres": thres, "valid_loader": valid_loader, "num_classes": args.num_classes, "epoch": start_epoch,
-                      "crop_size": (args.roi_z, args.roi_y, args.roi_x), "logger_valid": logger_valid, "is_softmax": args.softmax, "overlap": args.overlap}
+                      "crop_size": (args.roi_z, args.roi_y, args.roi_x), "logger_valid": logger_valid, "is_softmax": args.softmax}
         train_args = {"model": model, "device": device, "thres": thres, "train_loader": train_loader, "optimizer": optimizer, "scheduler": scheduler, "is_softmax": args.softmax, "epoch_num": args.epoch_num, "weight": weight,
                       "start_epoch": start_epoch, "log_iter": args.log_iter, "valid_epoch": args.valid_epoch, "ckpt_dir": ckpt_dir, "logger_train": logger_train, "writer": writer, "valid_args": valid_args}
         best_result = train(**train_args)
