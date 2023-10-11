@@ -11,7 +11,7 @@ def ce_loss(preds: torch.Tensor, targets: torch.Tensor, weight: torch.Tensor) ->
     return F.cross_entropy(preds, targets, weight, reduction="mean")
 
 
-def dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channels: List[int] = [0], is_softmax: bool = False, weights: List[float] = None, in_detail: bool = False) -> Union[Tuple[List[torch.FloatTensor], torch.FloatTensor], torch.FloatTensor]:
+def dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channels: List[int] = [0], is_softmax: bool = False, weights: torch.Tensor = None, in_detail: bool = False) -> Union[Tuple[List[torch.FloatTensor], torch.FloatTensor], torch.FloatTensor]:
     if is_softmax:
         preds = torch.softmax(preds, dim=1)
     else:
@@ -32,7 +32,7 @@ def dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channels: List[int
 
     assert preds.size() == targets.size()
 
-    assert not weights or len(weights) == preds.size(0)
+    assert weights is None or weights.size(0) == preds.size(0)
 
     intersection = (preds * targets).sum(-1)
 
@@ -41,7 +41,7 @@ def dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channels: List[int
     loss_channel = (1 - (2. * intersection + eps) / (union + eps)).sum(-1) / B
 
     if weights is not None:
-        loss_channel *= torch.FloatTensor(weights)
+        loss_channel *= weights
 
     loss = loss_channel.sum(-1) / num_tgt_channels
 
@@ -100,6 +100,12 @@ def generalized_dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channe
         return loss
 
 
+def sigmoid_binary_torch(tensor: torch.Tensor, threshold: List[float] = [0.5]) -> torch.Tensor:
+    for idx, thres in enumerate(threshold):
+        tensor[tensor[:, idx] >= thres] = 1
+        tensor[tensor[:, idx] < thres] = 0
+
+
 def softmax_binary_torch(tensor: torch.Tensor) -> torch.Tensor:
     num_classes = tensor.size(1)
     tensor = torch.argmax(tensor, dim=1)
@@ -108,7 +114,7 @@ def softmax_binary_torch(tensor: torch.Tensor) -> torch.Tensor:
     return torch.stack(one_hot, dim=1)
 
 
-def dice_with_norm_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int,  is_softmax: bool = False, threshold: float = 0.5) -> float:
+def dice_with_norm_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int,  is_softmax: bool = False, threshold: List[float] = [0.5]) -> float:
     # assert preds.size() == targets.size(), "the size of predict and target must be equal."
     if is_softmax:
         preds = softmax_binary_torch(preds)
@@ -116,8 +122,7 @@ def dice_with_norm_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channe
         preds = torch.sigmoid(preds)
         preds = torch.clamp(preds, min=1e-7, max=1).to(torch.float32)
 
-        preds[preds >= threshold] = 1
-        preds[preds < threshold] = 0
+        preds = sigmoid_binary_torch(preds, threshold)
 
     eps = 1e-5
 
@@ -135,13 +140,12 @@ def dice_with_norm_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channe
     return dice / B
 
 
-def dice_with_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int, is_softmax: bool = False, threshold: float = 0.5) -> float:
+def dice_with_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int, is_softmax: bool = False, threshold: List[float] = [0.5]) -> float:
     # assert preds.size() == targets.size(), "the size of predict and target must be equal."
     if is_softmax:
         preds = softmax_binary_torch(preds)
     else:
-        preds[preds >= threshold] = 1
-        preds[preds < threshold] = 0
+        preds = sigmoid_binary_torch(preds, threshold)
 
     eps = 1e-5
 
@@ -159,15 +163,14 @@ def dice_with_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: in
     return dice / B
 
 
-def VOE(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int, is_softmax: bool = False, threshold: float = 0.5) -> float:
+def VOE(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int, is_softmax: bool = False, threshold: List[float] = [0.5]) -> float:
     if is_softmax:
         preds = softmax_binary_torch(preds)
     else:
         preds = torch.sigmoid(preds)
         preds = torch.clamp(preds, min=1e-7, max=1).to(torch.float32)
 
-        preds[preds >= threshold] = 1
-        preds[preds < threshold] = 0
+        preds = sigmoid_binary_torch(preds, threshold)
 
     if threshold is not None:
         if preds.size(1) == 1:

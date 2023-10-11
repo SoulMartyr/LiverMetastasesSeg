@@ -34,7 +34,7 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: i
                 channel_range = [i for i in range(0, num_classes)]
             for idx, channel in enumerate(channel_range):
                 tmp_dice = dice_with_binary(
-                    pred, mask, channel, is_softmax, thres[idx])
+                    pred, mask, channel, is_softmax, thres)
                 total_dice[idx].add(tmp_dice)
                 if not is_softmax:
                     bacth_info += "thres:{} ".format(thres[idx])
@@ -53,7 +53,7 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: i
 
 
 def train(model: nn.Module, device: str,  thres: List[float], train_loader: DataLoader,  optimizer: optim.Optimizer, scheduler: optim.lr_scheduler._LRScheduler,  is_softmax: bool,
-          epoch_num: int, start_epoch: int, log_iter: int, valid_epoch: int, ckpt_dir: str, logger_train: logging.Logger, writer: SummaryWriter, valid_args: dict):
+          epoch_num: int, weight: torch.Tensor, start_epoch: int, log_iter: int, valid_epoch: int, ckpt_dir: str, logger_train: logging.Logger, writer: SummaryWriter, valid_args: dict):
     epoch = start_epoch
     best_result = 0.
     try:
@@ -61,7 +61,7 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
 
             is_valid = False
 
-            bce_loss_iter = AvgOutput()
+            ce_loss_iter = AvgOutput()
             dice_loss_iter = AvgOutput()
             core_dice_iter = AvgOutput()
 
@@ -84,31 +84,30 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
 
                 pred = model(img)
 
-                loss_bce = bce_loss(pred, mask)
-
                 out_channels = pred.size(1)
-                if is_softmax:
-                    tgt_dice_channels = [i for i in range(1, out_channels)]
+                if out_channels == 1:
+                    loss_ce = bce_loss(pred, mask)
                 else:
-                    tgt_dice_channels = [i for i in range(out_channels)]
-                loss_dice = dice_loss(
-                    pred, mask, tgt_channels=tgt_dice_channels, is_softmax=is_softmax)
+                    loss_ce = ce_loss(pred, mask, weight=weight)
 
-                train_loss = loss_bce + loss_dice
+                loss_dice = dice_loss(
+                    pred, mask, tgt_channels=[-1], is_softmax=is_softmax)
+
+                train_loss = loss_ce + loss_dice
 
                 optimizer.zero_grad()
                 train_loss.backward()
                 optimizer.step()
 
-                bce_loss_iter.add(loss_bce.item())
+                ce_loss_iter.add(loss_ce.item())
                 dice_loss_iter.add(loss_dice.item())
                 core_dice_iter.add(dice_with_norm_binary(
-                    pred, mask, -1, threshold=thres[-1], is_softmax=is_softmax))
+                    pred, mask, -1, threshold=thres, is_softmax=is_softmax))
 
                 if iteration % log_iter == 0:
                     logger_train.info(
-                        "Train Epoch:{} Iteration:{} Learning rate:{:.4f} - BCE Loss:{:.4f}, Dice Loss:{:.4f}".format(
-                            epoch, iteration, get_learning_rate(optimizer), bce_loss_iter.avg(), dice_loss_iter.avg()))
+                        "Train Epoch:{} Iteration:{} Learning rate:{:.4f} - CE Loss:{:.4f}, Dice Loss:{:.4f}".format(
+                            epoch, iteration, get_learning_rate(optimizer), ce_loss_iter.avg(), dice_loss_iter.avg()))
                     logger_train.info(
                         "Threshold {} - Core Dice:{:.4f},".format(thres[-1], core_dice_iter.avg()))
                     logger_train.info(
@@ -117,7 +116,7 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
                     writer.add_scalar(tag="loss/train", scalar_value=train_loss.item(),
                                       global_step=epoch * len(train_loader) + iteration)
 
-                    bce_loss_iter.clear()
+                    ce_loss_iter.clear()
                     dice_loss_iter.clear()
                     core_dice_iter.clear()
             epoch += 1
@@ -215,12 +214,17 @@ if __name__ == "__main__":
 
         if args.num_classes == 1:
             thres = [args.thres1]
+            weight = None
         elif args.num_classes == 2:
             thres = [args.thres1, args.thres2]
+            if args.softmax:
+                weight = torch.tensor([0.078, 0.065, 0.857]).to(device)
+            else:
+                weight = torch.tensor([0.143, 0.857]).to(device)
 
         valid_args = {"model": model, "device": device, "thres": thres, "valid_loader": valid_loader, "num_classes": args.num_classes, "epoch": start_epoch,
-                      "crop_size": (args.roi_z, args.roi_y, args.roi_x), "logger_valid": logger_valid, "is_softmax": args.softmax}
-        train_args = {"model": model, "device": device, "thres": thres, "train_loader": train_loader, "optimizer": optimizer, "scheduler": scheduler, "is_softmax": args.softmax, "epoch_num": args.epoch_num,
+                      "crop_size": (args.roi_z, args.roi_y, args.roi_x), "logger_valid": logger_valid, "is_softmax": args.softmax, "overlap": args.overlap}
+        train_args = {"model": model, "device": device, "thres": thres, "train_loader": train_loader, "optimizer": optimizer, "scheduler": scheduler, "is_softmax": args.softmax, "epoch_num": args.epoch_num, "weight": weight,
                       "start_epoch": start_epoch, "log_iter": args.log_iter, "valid_epoch": args.valid_epoch, "ckpt_dir": ckpt_dir, "logger_train": logger_train, "writer": writer, "valid_args": valid_args}
         best_result = train(**train_args)
         logger_valid.info("Best Dice: {}".format(str(best_result)))

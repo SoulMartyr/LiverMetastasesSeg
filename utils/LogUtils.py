@@ -4,9 +4,10 @@ import logging
 import shutil
 import yaml
 from argparse import ArgumentParser
+from typing import Tuple
 
 
-def get_month_and_day():
+def get_month_and_day() -> Tuple[int]:
     cur_datetime = datetime.datetime.now()
     cur_month = cur_datetime.month
     cur_day = cur_datetime.day
