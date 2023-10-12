@@ -2,10 +2,16 @@ import os
 import math
 import numpy as np
 import pandas as pd
+import SimpleITK as sitk
 from typing import List, Dict, Tuple, Sequence
 import torch
 from torch import optim, nn
 from torch.nn import functional as F
+
+from .DataUtils import resize_dhw_numpy
+
+
+# Mainly for training
 
 
 def get_index(index_path: str, fold: List[int]) -> List[str]:
@@ -59,6 +65,16 @@ class AvgOutput(object):
     def clear(self) -> None:
         self.sum = 0.
         self.count = 0
+
+
+# Mainly for predicting
+
+
+def set_pred_dir(pred_dir: str, file_dir: str) -> str:
+    pred_dir = os.path.join(pred_dir, file_dir)
+    if not os.path.exists(pred_dir):
+        os.makedirs(pred_dir)
+    return pred_dir
 
 
 def _get_scan_interval(
@@ -185,6 +201,32 @@ def sliding_window_inference_3d(inputs: torch.Tensor, crop_size: Tuple[int],  mo
         count[slice_s] += 1
 
     return outputs / count
+
+
+def predict_merge_channel_torch(tensor: torch.Tensor, is_softmax: bool) -> torch.Tensor:
+    """
+    tensor shape: [C, D, H, W]
+    """
+    if is_softmax:
+        output = torch.argmax(tensor, dim=0)
+    else:
+        C, D, H, W = tensor.size()
+        output = torch.zeros([D, H, W]).to(tensor.device)
+        for c in range(C):
+            output[tensor[c] == 1] = c+1
+    return output
+
+
+def save_predict_mask(mask_array: np.ndarray, img_path: str, mask_path: str) -> None:
+    img_itk = sitk.ReadImage(img_path)
+    img_size = sitk.GetArrayFromImage(img_itk).shape
+
+    mask_array = resize_dhw_numpy(mask_array, order=0, dhw=img_size)
+
+    mask_itk = sitk.GetImageFromArray(mask_array.astype(np.uint8))
+    mask_itk.CopyInformation(img_itk)
+
+    sitk.WriteImage(mask_itk, mask_path)
 
 
 if __name__ == "__main__":

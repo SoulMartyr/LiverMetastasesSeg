@@ -44,7 +44,7 @@ parser.add_argument('--in_channels', type=int, default=1,
                     help='input channel')
 parser.add_argument('--batch_size', type=int,
                     default=4, help='train batch size')
-parser.add_argument('--epoch_num', type=int, default=601,
+parser.add_argument('--epoch_num', type=int, default=600,
                     metavar='N', help='number of epochs to train (default: 501)')
 parser.add_argument('--lr', type=float, default=0.001,
                     metavar='LR', help='learning rate (default: 0.001)')
@@ -77,9 +77,14 @@ parser.add_argument('--overlap', default=0.5, type=float,
 
 # threshold
 parser.add_argument('--thres1', type=float, default=0.5,
-                    help='threshold for judging first channel(default: 0.5)')
+                    help='threshold for judging first class(default: 0.5)')
 parser.add_argument('--thres2', type=float, default=0.5,
-                    help='threshold for judging second channel(default: 0.5)')
+                    help='threshold for judging second class(default: 0.5)')
 
+# predict
+parser.add_argument('--pred_dir', type=str, default='./predicts',
+                    help='predict mask directory')
+
+# addititon information
 parser.add_argument('--add', type=str, default="", help='addition information')
 args = parser.parse_args()
