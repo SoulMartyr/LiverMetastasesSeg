@@ -73,7 +73,7 @@ parser.add_argument('--use_ckpt', action='store_true',
 parser.add_argument('--pre_ckpt_path', type=str,
                     default='./checkpoints/default/model.pth', help="pretrain checkpoint path")
 parser.add_argument('--overlap', default=0.5, type=float,
-                    metavar='WD', help='valid window slide overlap (default: 0.5)')
+                    help='valid window slide overlap (default: 0.5)')
 
 # threshold
 parser.add_argument('--thres1', type=float, default=0.5,

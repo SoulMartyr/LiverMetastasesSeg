@@ -152,7 +152,7 @@ if __name__ == "__main__":
         train_dataset = Dataset2D(**train_dataset_args)
         valid_dataset = Dataset2D(**valid_dataset_args)
 
-        train_dataloader_args = {"dataset": train_dataset, "batch_size": args.batch_size,
+        train_dataloader_args = {"dataset": train_dataset, "batch_size": args.batch_size, "shuffle": True,
                                  "num_workers": args.num_workers, "drop_last": False, "pin_memory": True}
         valid_dataloader_args = {"dataset": valid_dataset, "batch_size": 1,
                                  "num_workers": args.num_workers, "drop_last": False, "pin_memory": True}

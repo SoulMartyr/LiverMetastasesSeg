@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
-from typing import List, Dict, Tuple, Sequence
+from typing import List, Tuple, Sequence
 import torch
 from torch import optim, nn
 from torch.nn import functional as F

@@ -6,3 +6,4 @@ from models.models_2d.SegNet import SegNet
 from models.models_2d.SwinUNet import SwinUNet
 from models.models_2d.TransUNet import TransUNet
 from models.models_2d.UNet import UNet
+from models.models_2d.DefEDNet import DefEDNet

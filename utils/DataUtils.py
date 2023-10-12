@@ -19,14 +19,12 @@ def random_crop_numpy(img_array: np.ndarray, mask_array: np.ndarray, crop_size: 
         mask_flag = np.unique(mask_array)
         z_indexes, y_indexes, x_indexes = np.where(mask_array == mask_flag[-1])
         min_z, min_y, min_x, max_z, max_y, max_x = np.min(z_indexes), np.min(y_indexes), np.min(
-            x_indexes), np.max(z_indexes), np.max(y_indexes), np.max(x_indexes)
-
+            x_indexes), np.max(z_indexes) + 1, np.max(y_indexes) + 1, np.max(x_indexes) + 1
         diff_z, diff_y, diff_x = tuple_sub(crop_size, (min_z, min_y, min_x))
         min_z, min_y, min_x = min_z + \
             max(diff_z, 0), min_y + max(diff_y, 0), min_x + max(diff_x, 0)
         max_z, max_y, max_x = min(z, max_z + max(diff_z, 0)), min(y,
                                                                   max_y + max(diff_y, 0)), min(x, max_x + max(diff_x, 0))
-
     else:
         min_z, min_y, min_x, max_z, max_y, max_x = *crop_size, z, y, x
 
@@ -135,7 +133,7 @@ def augmentation(img_array: np.ndarray, mask_array: np.ndarray) -> Tuple[np.ndar
 
 class Dataset2D(nn.Module):
     def __init__(self, data_path: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
-                 crop_size: Tuple[int] = (32, 224, 224), norm="zscore", dhw=(-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
+                 crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
         super(Dataset2D, self).__init__()
         assert num_classes == 1 or num_classes == 2, "Num Classes should be 1 or 2"
         assert norm in ["zscore",
@@ -200,7 +198,7 @@ class Dataset2D(nn.Module):
 
 class Dataset3D(nn.Module):
     def __init__(self, data_path: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
-                 crop_size: Tuple[int] = (32, 224, 224), norm="zscore", dhw=(-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
+                 crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
         super(Dataset3D, self).__init__()
 
         assert num_classes == 1 or num_classes == 2, "Num Classes should be 1 or 2"
@@ -260,7 +258,7 @@ class Dataset3D(nn.Module):
 
 
 class Dataset2D_Predict(nn.Module):
-    def __init__(self, data_path: str,  image_dir: str, index_list: list, norm="zscore", dhw=(-1, 224, 224)) -> None:
+    def __init__(self, data_path: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224)) -> None:
         super(Dataset2D_Predict, self).__init__()
         assert norm in ["zscore",
                         "minmax"], "norm should be \'zscore\' or \'minmax\'"
@@ -294,7 +292,7 @@ class Dataset2D_Predict(nn.Module):
 
 
 class Dataset3D_Predict(nn.Module):
-    def __init__(self, data_path: str,  image_dir: str, index_list: list, norm="zscore", dhw=(-1, 224, 224)) -> None:
+    def __init__(self, data_path: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224)) -> None:
         super(Dataset3D, self).__init__()
 
         assert norm in ["zscore",
