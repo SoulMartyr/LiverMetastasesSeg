@@ -102,8 +102,9 @@ def generalized_dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channe
 
 def sigmoid_binary_torch(tensor: torch.Tensor, threshold: List[float] = [0.5]) -> torch.Tensor:
     for idx, thres in enumerate(threshold):
-        tensor[tensor[:, idx] >= thres] = 1
-        tensor[tensor[:, idx] < thres] = 0
+        tensor[:, idx][tensor[:, idx] >= thres] = 1
+        tensor[:, idx][tensor[:, idx] < thres] = 0
+    return tensor
 
 
 def softmax_binary_torch(tensor: torch.Tensor) -> torch.Tensor:
