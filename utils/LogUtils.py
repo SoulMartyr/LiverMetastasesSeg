@@ -14,8 +14,8 @@ def get_month_and_day() -> Tuple[int]:
     return cur_month, cur_day
 
 
-def set_logdir(log_path: str, file_dir: str, is_lock: bool) -> str:
-    log_dir = os.path.join(log_path, file_dir)
+def set_logdir(log_path: str, file_dir: str, fold: int, is_lock: bool) -> str:
+    log_dir = os.path.join(log_path, file_dir, "fold{}".format(fold))
     if os.path.exists(log_dir):
         if not os.path.exists(os.path.join(log_dir, "lock.txt")):
             shutil.rmtree(log_dir)

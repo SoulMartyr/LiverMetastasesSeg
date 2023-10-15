@@ -72,8 +72,8 @@ if __name__ == "__main__":
     model = model_maker(args.in_channels, out_channels)
     if args.gpu:
         gpus = args.devices
+        assert len(gpus) == 1, "predict should use single device"
         device = torch.device("cuda:{}".format(gpus[0]))
-        model = nn.DataParallel(model, device_ids=gpus)
     else:
         device = torch.device("cpu")
     model = model.to(device)

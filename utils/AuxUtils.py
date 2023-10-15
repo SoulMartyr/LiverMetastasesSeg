@@ -33,19 +33,22 @@ def get_learning_rate(optimizer: optim.Optimizer) -> float:
     return lr
 
 
-def set_ckpt_dir(ckpt_dir: str, log_file: str) -> str:
-    ckpt_dir = os.path.join(ckpt_dir, log_file)
+def set_ckpt_dir(ckpt_dir: str, log_file: str, fold: int) -> str:
+    ckpt_dir = os.path.join(ckpt_dir, log_file, "fold{}".format(fold))
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
     return ckpt_dir
 
 
-def save_weight(ckpt_dir: str, epoch: int, model_state_dict: Dict[str, float], optim_state_dict: Dict[str, float], sched_state_dict: Dict[str, float]):
+def save_weight(ckpt_dir: str, epoch: int, model: nn.Module, optimizer: optim.Optimizer, scheduler: optim.lr_scheduler._LRScheduler):
+    if isinstance(model, nn.DataParallel):
+        model = model.module
+
     checkpoint = {
         "epoch": epoch,
-        "model_state_dict": model_state_dict,
-        "optim_state_dict": optim_state_dict,
-        "sched_state_dict": sched_state_dict
+        "model_state_dict": model.state_dict(),
+        "optim_state_dict": optimizer.state_dict(),
+        "sched_state_dict": scheduler.state_dict()
     }
     torch.save(checkpoint, ckpt_dir + '/model.pth')
 

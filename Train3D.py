@@ -56,25 +56,20 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
           epoch_num: int, weight: torch.Tensor, start_epoch: int, log_iter: int, valid_epoch: int, ckpt_dir: str, logger_train: logging.Logger, writer: SummaryWriter, valid_args: dict):
     epoch = start_epoch
     best_result = 0.
+    ce_loss_iter = AvgOutput()
+    dice_loss_iter = AvgOutput()
+    core_dice_iter = AvgOutput()
+
     try:
         while epoch <= epoch_num:
-
-            is_valid = False
-
-            ce_loss_iter = AvgOutput()
-            dice_loss_iter = AvgOutput()
-            core_dice_iter = AvgOutput()
+            if epoch % valid_epoch == 0 and epoch != start_epoch:
+                valid_args["epoch"] = epoch
+                valid_result = valid(**valid_args)
+                if valid_result > best_result:
+                    save_weight(ckpt_dir, epoch, model, optimizer, scheduler)
+                    best_result = valid_result
 
             for iteration, batch in enumerate(train_loader):
-                if not is_valid and epoch % valid_epoch == 0 and epoch != start_epoch:
-                    valid_args["epoch"] = epoch
-                    valid_result = valid(**valid_args)
-                    if valid_result > best_result:
-                        save_weight(ckpt_dir, epoch, model.state_dict(
-                        ), optimizer.state_dict(), scheduler.state_dict())
-                        best_result = valid_result
-                    is_valid = True
-
                 img = batch['img'].to(device)
                 mask = batch['mask'].to(device)
 
@@ -130,14 +125,14 @@ if __name__ == "__main__":
     for fold in args.fold:
         cur_month, cur_day = get_month_and_day()
         file_dir = str(cur_month) + str(cur_day) + "_" + \
-            args.log_folder + "_" + "fold{}".format(fold)
+            args.log_folder
 
-        log_dir = set_logdir(args.log_dir, file_dir, is_lock=args.lock)
+        log_dir = set_logdir(args.log_dir, file_dir, fold, is_lock=args.lock)
         save_args(args, log_dir)
         logger_train = log_init(log_dir, fold, mode="train")
         logger_valid = log_init(log_dir, fold, mode="valid")
         writer = SummaryWriter(log_dir=log_dir)
-        ckpt_dir = set_ckpt_dir(args.ckpt_dir, file_dir)
+        ckpt_dir = set_ckpt_dir(args.ckpt_dir, file_dir, fold)
         logger_train.info("Init Success")
 
         # Dataset
