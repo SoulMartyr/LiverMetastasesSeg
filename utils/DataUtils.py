@@ -35,6 +35,23 @@ def random_crop_numpy(img_array: np.ndarray, mask_array: np.ndarray, crop_size: 
     return img_array[crop_bot_z:crop_top_z, crop_bot_y:crop_top_y, crop_bot_x:crop_top_x], mask_array[crop_bot_z:crop_top_z, crop_bot_y:crop_top_y, crop_bot_x:crop_top_x]
 
 
+def expand_keyframe_numpy(img_array: np.ndarray, mask_array: np.ndarray, expand: int) -> Tuple[np.ndarray, np.ndarray]:
+    z, *_ = img_array.shape
+    mask_flag = np.unique(mask_array)
+    z_indexes, *_ = np.where(mask_array == mask_flag[-1])
+    min_z, max_z = np.min(z_indexes), np.max(z_indexes) + 1
+
+    lower_expand_z, upper_expand_z = min(min_z, expand), min(z-max_z, expand)
+
+    if lower_expand_z < expand:
+        upper_expand_z += expand - lower_expand_z
+    elif upper_expand_z < expand:
+        lower_expand_z += expand - upper_expand_z
+
+    bot_z, top_z = min_z - lower_expand_z, max_z + upper_expand_z
+    return img_array[bot_z:top_z], mask_array[bot_z:top_z]
+
+
 def resize_dhw_numpy(array: np.ndarray, order: int, dhw: tuple) -> np.ndarray:
     dhw = tuple([array.shape[i] if dhw[i] == -1 else dhw[i] for i in range(3)])
 
@@ -133,7 +150,7 @@ def augmentation(img_array: np.ndarray, mask_array: np.ndarray) -> Tuple[np.ndar
 
 class Dataset2D(nn.Module):
     def __init__(self, data_path: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
-                 crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
+                 crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), expand_slices: int = 5, is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
         super(Dataset2D, self).__init__()
         assert num_classes == 1 or num_classes == 2, "Num Classes should be 1 or 2"
         assert norm in ["zscore",
@@ -148,6 +165,7 @@ class Dataset2D(nn.Module):
         self.crop_size = crop_size
         self.norm = norm
         self.dhw = dhw
+        self.expand_slices = expand_slices
         self.is_keyframe = is_keyframe
         self.is_softmax = is_softmax
         self.is_flip = is_flip
@@ -182,6 +200,9 @@ class Dataset2D(nn.Module):
 
             if self.is_flip:
                 img_array, mask_array = augmentation(img_array, mask_array)
+        else:
+            img_array, mask_array = expand_keyframe_numpy(
+                img_array, mask_array, self.expand_slices)
 
         mask_array = ont_hot_mask_numpy(
             mask_array, num_classes=self.num_classes, is_softmax=self.is_softmax)
@@ -198,7 +219,7 @@ class Dataset2D(nn.Module):
 
 class Dataset3D(nn.Module):
     def __init__(self, data_path: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
-                 crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
+                 crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), expand_slices: int = 5, is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
         super(Dataset3D, self).__init__()
 
         assert num_classes == 1 or num_classes == 2, "Num Classes should be 1 or 2"
@@ -214,6 +235,7 @@ class Dataset3D(nn.Module):
         self.crop_size = crop_size
         self.norm = norm
         self.dhw = dhw
+        self.expand_slices = expand_slices
         self.is_keyframe = is_keyframe
         self.is_softmax = is_softmax
         self.is_flip = is_flip
@@ -247,6 +269,9 @@ class Dataset3D(nn.Module):
                 img_array, mask_array, crop_size=self.crop_size, is_keyframe=self.is_keyframe)
             if self.is_flip:
                 img_array, mask_array = augmentation(img_array, mask_array)
+        else:
+            img_array, mask_array = expand_keyframe_numpy(
+                img_array, mask_array, self.expand_slices)
 
         mask_array = ont_hot_mask_numpy(
             mask_array, num_classes=self.num_classes, is_softmax=self.is_softmax)
@@ -334,9 +359,9 @@ if __name__ == "__main__":
             train_patients.extend(index_df.loc[i, "index"].strip().split(" "))
     test_patients = index_df.loc[fold, "index"].strip().split(" ")
 
-    data_path = 'data\\resection_V'
+    data_path = './data/resection_V'
     train_dataset = Dataset2D(data_path=data_path, image_dir="images", mask_dir="liver_tumor_masks",
-                              index_list=train_patients, is_train=True, num_classes=3, crop_size=(32, 224, 224), norm="zscore", dhw=(-1, 224, 224), is_keyframe=True, is_softmax=True, is_flip=False)
+                              index_list=train_patients, is_train=False, num_classes=2, crop_size=(32, 224, 224), norm="zscore", dhw=(-1, 224, 224), is_keyframe=True, is_softmax=True, is_flip=False)
 
     dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
     print("len", len(dataloader))

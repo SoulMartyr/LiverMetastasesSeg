@@ -112,6 +112,10 @@ def sliding_window_inference_2d(inputs: torch.Tensor, crop_size: Tuple[int],  mo
     batch_size, _, *image_size_ = inputs.shape
 
     assert len(crop_size) == len(image_size_)
+
+    if outputs_size[2] < crop_size[0]:
+        crop_size = (outputs_size[2], *crop_size[1:])
+
     image_size = tuple(max(image_size_[i], crop_size[i])
                        for i in range(num_spatial_dims))
     pad_size = []

@@ -144,10 +144,10 @@ if __name__ == "__main__":
                                 f for f in range(5) if f != fold])
         valid_index = get_index(args.index_path, fold=[fold])
 
-        train_dataset_args = {"data_path": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": train_index, "is_train": True, "num_classes": args.num_classes,
-                              "crop_size": (args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_flip": args.flip}
-        valid_dataset_args = {"data_path": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": valid_index, "is_train": False, "num_classes": args.num_classes,
-                              "crop_size": (args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_flip": args.flip}
+        train_dataset_args = {"data_path": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": train_index, "is_train": True, "num_classes": args.num_classes, "crop_size": (
+            args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "expand_slices": args.expand, "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_flip": args.flip}
+        valid_dataset_args = {"data_path": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": valid_index, "is_train": False, "num_classes": args.num_classes, "crop_size": (
+            args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "expand_slices": args.expand, "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_flip": args.flip}
 
         train_dataset = Dataset2D(**train_dataset_args)
         valid_dataset = Dataset2D(**valid_dataset_args)

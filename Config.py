@@ -74,6 +74,8 @@ parser.add_argument('--pre_ckpt_path', type=str,
                     default='./checkpoints/default/model.pth', help="pretrain checkpoint path")
 parser.add_argument('--overlap', default=0.5, type=float,
                     help='valid window slide overlap (default: 0.5)')
+parser.add_argument('--expand', default=5, type=int,
+                    help='Unidirectional expanded liver slices (default: 5)')
 
 # threshold
 parser.add_argument('--thres1', type=float, default=0.5,
