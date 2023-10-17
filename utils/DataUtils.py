@@ -293,7 +293,7 @@ class Dataset2D_Predict(nn.Module):
 
 class Dataset3D_Predict(nn.Module):
     def __init__(self, data_path: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224)) -> None:
-        super(Dataset3D, self).__init__()
+        super(Dataset3D_Predict, self).__init__()
 
         assert norm in ["zscore",
                         "minmax"], "norm should be \'zscore\' or \'minmax\'"
@@ -313,6 +313,11 @@ class Dataset3D_Predict(nn.Module):
         img = sitk.ReadImage(img_path, sitk.sitkInt32)
 
         img_array = sitk.GetArrayFromImage(img)
+        
+        if self.norm == "zscore":
+            img_array = z_score_norm_2d_numpy(img_array, nonzero=True)
+        elif self.norm == "minmax":
+            img_array = min_max_norm_2d_numpy(img_array)
 
         img_array = resize_dhw_numpy(img_array, order=3, dhw=self.dhw)
 
