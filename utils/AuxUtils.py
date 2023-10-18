@@ -73,8 +73,8 @@ class AvgOutput(object):
 # Mainly for predicting
 
 
-def set_pred_dir(pred_dir: str, file_dir: str) -> str:
-    pred_dir = os.path.join(pred_dir, file_dir)
+def set_pred_dir(pred_dir: str, file_dir: str, fold: int) -> str:
+    pred_dir = os.path.join(pred_dir, file_dir, "fold{}".format(fold))
     if not os.path.exists(pred_dir):
         os.makedirs(pred_dir)
     return pred_dir

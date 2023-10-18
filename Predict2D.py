@@ -19,9 +19,7 @@ def predict(pred_loader: DataLoader, model: nn.Module, pred_dir: str, out_channe
         img_path = batch["img_path"][0]
         file = batch["file"][0]
 
-        outputs_size = list(img.size())
-        outputs_size[1] = out_channels
-        outputs_size = torch.Size(outputs_size)
+        outputs_size = torch.Size((img.size(0), out_channels, *img.size()[2:]))
 
         with torch.no_grad():
             pred = sliding_window_inference_2d(
@@ -48,10 +46,9 @@ if __name__ == "__main__":
     fold = args.fold[0]
 
     cur_month, cur_day = get_month_and_day()
-    file_dir = str(cur_month) + str(cur_day) + "_" + \
-        args.log_folder + "_" + "fold{}".format(fold)
+    file_dir = str(cur_month) + str(cur_day) + "_" + args.log_folder
 
-    pred_dir = set_pred_dir(args.pred_dir, file_dir)
+    pred_dir = set_pred_dir(args.pred_dir, file_dir, fold)
 
     pred_index = get_index(args.index_path, fold=[fold])
 

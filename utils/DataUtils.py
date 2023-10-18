@@ -59,14 +59,16 @@ def min_max_norm_3d_numpy(array: np.ndarray) -> np.ndarray:
 
 def z_score_norm_3d_numpy(array: np.ndarray, nonzero: bool = True) -> np.ndarray:
     if nonzero:
-        indexes = np.nonzero(array)
+        indexes = array != 0
         arr_mean = np.mean(array[indexes])
         arr_std = np.std(array[indexes])
+        array[indexes] = (array[indexes] - arr_mean) / arr_std
     else:
         arr_mean = np.mean(array)
         arr_std = np.std(array)
+        array = (array - arr_mean) / arr_std
 
-    return (array - arr_mean) / arr_std
+    return array
 
 
 def min_max_norm_2d_numpy(array: np.ndarray) -> np.ndarray:
@@ -78,13 +80,17 @@ def min_max_norm_2d_numpy(array: np.ndarray) -> np.ndarray:
 
 def z_score_norm_2d_numpy(array: np.ndarray, nonzero: bool = True) -> np.ndarray:
     if nonzero:
+        indexes = array == 0
         arr_mean = array.mean(axis=(1, 2), where=(array != 0), keepdims=True)
         arr_std = array.std(axis=(1, 2), where=(array != 0), keepdims=True)
+        array = (array - arr_mean) / arr_std
+        array[indexes] = 0
     else:
         arr_mean = array.mean(axis=(1, 2), keepdims=True)
         arr_std = array.std(axis=(1, 2), keepdims=True)
+        array = (array - arr_mean) / arr_std
 
-    return (array - arr_mean) / arr_std
+    return array
 
 
 def ont_hot_mask_numpy(array: np.ndarray, num_classes: int, is_softmax: bool) -> np.ndarray:
@@ -280,9 +286,9 @@ class Dataset2D_Predict(nn.Module):
         img_array = sitk.GetArrayFromImage(img)
 
         if self.norm == "zscore":
-            img_array = z_score_norm_2d_numpy(img_array, nonzero=True)
+            img_array = z_score_norm_3d_numpy(img_array, nonzero=True)
         elif self.norm == "minmax":
-            img_array = min_max_norm_2d_numpy(img_array)
+            img_array = min_max_norm_3d_numpy(img_array)
 
         img_array = resize_dhw_numpy(img_array, order=3, dhw=self.dhw)
 
@@ -313,11 +319,11 @@ class Dataset3D_Predict(nn.Module):
         img = sitk.ReadImage(img_path, sitk.sitkInt32)
 
         img_array = sitk.GetArrayFromImage(img)
-        
+
         if self.norm == "zscore":
-            img_array = z_score_norm_2d_numpy(img_array, nonzero=True)
+            img_array = z_score_norm_3d_numpy(img_array, nonzero=True)
         elif self.norm == "minmax":
-            img_array = min_max_norm_2d_numpy(img_array)
+            img_array = min_max_norm_3d_numpy(img_array)
 
         img_array = resize_dhw_numpy(img_array, order=3, dhw=self.dhw)
 
@@ -339,9 +345,9 @@ if __name__ == "__main__":
             train_patients.extend(index_df.loc[i, "index"].strip().split(" "))
     test_patients = index_df.loc[fold, "index"].strip().split(" ")
 
-    data_path = 'data\\resection_V'
+    data_path = 'data/resection_V'
     train_dataset = Dataset2D(data_path=data_path, image_dir="images", mask_dir="liver_tumor_masks",
-                              index_list=train_patients, is_train=True, num_classes=3, crop_size=(32, 224, 224), norm="zscore", dhw=(-1, 224, 224), is_keyframe=True, is_softmax=True, is_flip=False)
+                              index_list=train_patients, is_train=True, num_classes=2, crop_size=(32, 224, 224), norm="zscore", dhw=(-1, 224, 224), is_keyframe=True, is_softmax=True, is_flip=False)
 
     dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
     print("len", len(dataloader))

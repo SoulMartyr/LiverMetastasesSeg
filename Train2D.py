@@ -62,12 +62,15 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
 
     try:
         while epoch <= epoch_num:
+
             if epoch % valid_epoch == 0 and epoch != start_epoch:
                 valid_args["epoch"] = epoch
                 valid_result = valid(**valid_args)
                 if valid_result > best_result:
                     save_weight(ckpt_dir, epoch, model, optimizer, scheduler)
                     best_result = valid_result
+
+            logger_train.info("Train Epoch:{}".format(epoch))
 
             for iteration, batch in enumerate(train_loader):
                 img = batch['img'].to(device)
@@ -94,28 +97,27 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
                 train_loss.backward()
                 optimizer.step()
 
+                writer.add_scalar(tag="loss/train", scalar_value=train_loss.item(),
+                                  global_step=epoch * len(train_loader) + iteration)
+
                 ce_loss_iter.add(loss_ce.item())
                 dice_loss_iter.add(loss_dice.item())
                 core_dice_iter.add(dice_with_norm_binary(
                     pred, mask, -1, threshold=thres, is_softmax=is_softmax))
 
-                if iteration % log_iter == 0:
-                    logger_train.info(
-                        "Train Epoch:{} Iteration:{} Learning rate:{:.5f} - CE Loss:{:.4f}, Dice Loss:{:.4f}".format(
-                            epoch, iteration, get_learning_rate(optimizer), ce_loss_iter.avg(), dice_loss_iter.avg()))
-                    logger_train.info(
-                        "Threshold {} - Core Dice:{:.4f},".format(thres[-1], core_dice_iter.avg()))
-                    logger_train.info(
-                        "--------------------------------------------------")
-
-                    writer.add_scalar(tag="loss/train", scalar_value=train_loss.item(),
-                                      global_step=epoch * len(train_loader) + iteration)
+                if iteration % log_iter == 0 and iteration != 0:
+                    iter_info = "Iteration:{} Learning rate:{:.5f} CE Loss:{:.4f}, Dice Loss:{:.4f} Core Dice:{:.4f}".format(
+                        iteration, get_learning_rate(optimizer), ce_loss_iter.avg(), dice_loss_iter.avg(), core_dice_iter.avg())
+                    logger_train.info(iter_info)
 
                     ce_loss_iter.clear()
                     dice_loss_iter.clear()
                     core_dice_iter.clear()
+
             epoch += 1
             scheduler.step()
+            logger_train.info("—"*len(iter_info))
+
     except Exception as e:
         logger_train.error(e, exc_info=True)
         sys.exit()
@@ -131,11 +133,12 @@ if __name__ == "__main__":
         file_dir = str(cur_month) + str(cur_day) + "_" + \
             args.log_folder
 
-        log_dir = set_logdir(args.log_dir, file_dir, fold, is_lock=args.lock)
-        save_args(args, log_dir)
-        logger_train = log_init(log_dir, fold, mode="train")
-        logger_valid = log_init(log_dir, fold, mode="valid")
-        writer = SummaryWriter(log_dir=log_dir)
+        log_dir_fold = set_logdir(
+            args.log_dir, file_dir, fold, is_lock=args.lock)
+        save_args(args, log_dir_fold)
+        logger_train = log_init(log_dir_fold, fold, mode="train")
+        logger_valid = log_init(log_dir_fold, fold, mode="valid")
+        writer = SummaryWriter(log_dir=log_dir_fold)
         ckpt_dir = set_ckpt_dir(args.ckpt_dir, file_dir, fold)
         logger_train.info("Init Success")
 
@@ -199,7 +202,7 @@ if __name__ == "__main__":
         if args.use_ckpt:
             ckpt = torch.load(args.pre_ckpt_path)
             start_epoch = ckpt['epoch']
-            model.load_state_dict(ckpt['model_state_dict'], strict=True)
+            model.module.load_state_dict(ckpt['model_state_dict'], strict=True)
             optimizer.load_state_dict(ckpt['optim_state_dict'])
             scheduler.load_state_dict(ckpt['sched_state_dict'])
         else:
