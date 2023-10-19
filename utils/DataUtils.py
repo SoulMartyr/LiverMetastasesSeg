@@ -174,6 +174,10 @@ class Dataset2D(nn.Module):
         assert len(np.unique(
             mask_array).tolist()) == self.num_classes + 1, "numbers in mask dont equal to num classes"
 
+        nonzero_layers = np.nonzero(img_array.sum(axis=(1, 2)))[0]
+        img_array = img_array[nonzero_layers]
+        mask_array = mask_array[nonzero_layers]
+
         if self.norm == "zscore":
             img_array = z_score_norm_2d_numpy(img_array, nonzero=True)
         elif self.norm == "minmax":
@@ -239,6 +243,10 @@ class Dataset3D(nn.Module):
 
         assert len(np.unique(
             mask_array).tolist()) == self.num_classes + 1, "numbers in mask dont equal to num classes"
+
+        nonzero_layers = np.nonzero(img_array.sum(axis=(1, 2)))[0]
+        img_array = img_array[nonzero_layers]
+        mask_array = mask_array[nonzero_layers]
 
         if self.norm == "zscore":
             img_array = z_score_norm_3d_numpy(img_array, nonzero=True)
