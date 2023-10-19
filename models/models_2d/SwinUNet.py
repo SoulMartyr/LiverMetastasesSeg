@@ -1,3 +1,4 @@
+import copy
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
@@ -124,7 +125,7 @@ class BasicLayer_up(nn.Module):
         return x
 
 
-class SwinUNet(nn.Module):
+class SwinUNetSys(nn.Module):
     r""" Swin Transformer
         A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
           https://arxiv.org/pdf/2103.14030
@@ -314,9 +315,60 @@ class SwinUNet(nn.Module):
         return x
 
 
+class SwinUNet(nn.Module):
+    def __init__(self, in_channels=1, out_channels=3, img_size=224, patch_size=4,
+                 embed_dim=96):
+        super(SwinUNet, self).__init__()
+
+        assert in_channels == 1 or in_channels == 3
+
+        self.num_classes = out_channels
+
+        self.swin_unet = SwinUNetSys(
+            in_channels, out_channels, img_size, patch_size, embed_dim)
+        self.load_ckpt()
+
+    def load_ckpt(self):
+        pretrained_path = "checkpoints/pretrain/swin_tiny_patch4_window7_224.pth"
+        if pretrained_path is not None:
+            device = 'cpu'
+            pretrained_dict = torch.load(pretrained_path, map_location=device)
+            if "model" not in pretrained_dict:
+                pretrained_dict = {k[17:]: v for k,
+                                   v in pretrained_dict.items()}
+                for k in list(pretrained_dict.keys()):
+                    if "output" in k:
+                        del pretrained_dict[k]
+                self.swin_unet.load_state_dict(pretrained_dict, strict=False)
+                return
+            pretrained_dict = pretrained_dict['model']
+
+            model_dict = self.swin_unet.state_dict()
+            full_dict = copy.deepcopy(pretrained_dict)
+            for k, v in pretrained_dict.items():
+                if "layers." in k:
+                    current_layer_num = 3-int(k[7:8])
+                    current_k = "layers_up." + str(current_layer_num) + k[8:]
+                    full_dict.update({current_k: v})
+            for k in list(full_dict.keys()):
+                if k in model_dict:
+                    if full_dict[k].shape != model_dict[k].shape:
+                        del full_dict[k]
+
+            self.swin_unet.load_state_dict(full_dict, strict=False)
+
+    def forward(self, x):
+        C = x.size()[1]
+        assert C == 1 or C == 3
+        if C == 1:
+            x = x.repeat(1, 3, 1, 1)
+
+        logits = self.swin_unet(x)
+        return logits
+
+
 if __name__ == "__main__":
-    a = torch.randn([1, 1, 256, 256])
-    model = SwinUNet(in_channels=1, out_channels=3,
-                     img_size=256, window_size=8)
+    a = torch.randn([1, 1, 224, 224])
+    model = SwinUNet(in_channels=3, out_channels=3)
     out = model(a)
     print(out.shape)
