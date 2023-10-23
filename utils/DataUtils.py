@@ -294,9 +294,9 @@ class Dataset2D_Predict(nn.Module):
         img_array = sitk.GetArrayFromImage(img)
 
         if self.norm == "zscore":
-            img_array = z_score_norm_3d_numpy(img_array, nonzero=True)
+            img_array = z_score_norm_2d_numpy(img_array, nonzero=True)
         elif self.norm == "minmax":
-            img_array = min_max_norm_3d_numpy(img_array)
+            img_array = min_max_norm_2d_numpy(img_array)
 
         img_array = resize_dhw_numpy(img_array, order=3, dhw=self.dhw)
 
