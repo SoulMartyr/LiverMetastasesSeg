@@ -1,15 +1,18 @@
 import sys
+import logging
+from typing import List, Tuple
 
+import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 import Config
 from models import models_2d
-from utils.AuxUtils import *
-from utils.LossUtils import *
-from utils.LogUtils import *
-from utils.DataUtils import *
+from utils.AuxUtils import AvgOutput, set_ckpt_dir, get_index, get_learning_rate, save_weight, sliding_window_inference_2d
+from utils.LossUtils import dice_with_norm_binary, dice_with_binary, bce_loss, ce_loss, dice_loss
+from utils.LogUtils import get_month_and_day, set_logdir, save_args, log_init
+from utils.DataUtils import Dataset2D
 
 
 def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, crop_size: Tuple[int], device: str,
@@ -200,7 +203,7 @@ if __name__ == "__main__":
                 optimizer, args.epochs + 10)
 
         if args.use_ckpt:
-            ckpt = torch.load(args.pre_ckpt_path)
+            ckpt = torch.load(args.ckpt_path)
             start_epoch = ckpt['epoch']
             model.module.load_state_dict(ckpt['model_state_dict'], strict=True)
             optimizer.load_state_dict(ckpt['optim_state_dict'])

@@ -3,15 +3,15 @@ import torch.nn.functional as F
 from typing import Union, List, Tuple
 
 
-def bce_loss(preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-    return F.binary_cross_entropy_with_logits(preds, targets, reduction='mean')
+def bce_loss(preds: torch.Tensor, gts: torch.Tensor) -> torch.Tensor:
+    return F.binary_cross_entropy_with_logits(preds, gts, reduction='mean')
 
 
-def ce_loss(preds: torch.Tensor, targets: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
-    return F.cross_entropy(preds, targets, weight, reduction="mean")
+def ce_loss(preds: torch.Tensor, gts: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
+    return F.cross_entropy(preds, gts, weight, reduction="mean")
 
 
-def dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channels: List[int] = [0], is_softmax: bool = False, weights: torch.Tensor = None, in_detail: bool = False) -> Union[Tuple[List[torch.FloatTensor], torch.FloatTensor], torch.FloatTensor]:
+def dice_loss(preds: torch.Tensor, gts: torch.Tensor, tgt_channels: List[int] = [0], is_softmax: bool = False, weights: torch.Tensor = None, in_detail: bool = False) -> Union[Tuple[List[torch.FloatTensor], torch.FloatTensor], torch.FloatTensor]:
     if is_softmax:
         preds = torch.softmax(preds, dim=1)
     else:
@@ -26,17 +26,17 @@ def dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channels: List[int
     axis_order = (1, 0) + tuple(range(2, preds.dim()))
 
     preds = preds.permute(axis_order).reshape(C, B, -1)
-    targets = targets.permute(axis_order).reshape(C, B, -1)
+    gts = gts.permute(axis_order).reshape(C, B, -1)
 
-    preds, targets = preds[tgt_channels], targets[tgt_channels]
+    preds, gts = preds[tgt_channels], gts[tgt_channels]
 
-    assert preds.size() == targets.size()
+    assert preds.size() == gts.size()
 
     assert weights is None or weights.size(0) == preds.size(0)
 
-    intersection = (preds * targets).sum(-1)
+    intersection = (preds * gts).sum(-1)
 
-    union = (preds + targets).sum(-1)
+    union = (preds + gts).sum(-1)
 
     loss_channel = (1 - (2. * intersection + eps) / (union + eps)).sum(-1) / B
 
@@ -52,7 +52,7 @@ def dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channels: List[int
         return loss
 
 
-def generalized_dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channels: List[int] = [0], is_softmax: bool = False,
+def generalized_dice_loss(preds: torch.Tensor, gts: torch.Tensor, tgt_channels: List[int] = [0], is_softmax: bool = False,
                           weight_type: str = 'square', in_detail: bool = False) -> Union[Tuple[List[torch.FloatTensor], torch.FloatTensor], torch.FloatTensor]:
     if is_softmax:
         preds = torch.softmax(preds, dim=1)
@@ -69,13 +69,13 @@ def generalized_dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channe
     axis_order = (1, 0) + tuple(range(2, preds.dim()))
 
     preds = preds.permute(axis_order).reshape(C, B, -1)
-    targets = targets.permute(axis_order).reshape(C, B, -1)
+    gts = gts.permute(axis_order).reshape(C, B, -1)
 
-    preds, targets = preds[tgt_channels], targets[tgt_channels]
+    preds, gts = preds[tgt_channels], gts[tgt_channels]
 
-    assert preds.size() == targets.size()
+    assert preds.size() == gts.size()
 
-    target_sum = targets.sum(-1)
+    target_sum = gts.sum(-1)
 
     if weight_type == 'square':
         class_weights = 1. / (target_sum * target_sum + eps)
@@ -86,8 +86,8 @@ def generalized_dice_loss(preds: torch.Tensor, targets: torch.Tensor, tgt_channe
     else:
         raise ValueError('Check out the weight_type :', weight_type)
 
-    intersection = (preds * targets).sum(-1) * class_weights
-    union = (preds + targets).sum(-1) * class_weights + eps
+    intersection = (preds * gts).sum(-1) * class_weights
+    union = (preds + gts).sum(-1) * class_weights + eps
 
     loss_channel = (1 - 2. * (2. * intersection + eps) /
                     (union + eps)).sum(-1) / B
@@ -115,8 +115,8 @@ def softmax_binary_torch(tensor: torch.Tensor) -> torch.Tensor:
     return torch.stack(one_hot, dim=1)
 
 
-def dice_with_norm_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int,  is_softmax: bool = False, threshold: List[float] = [0.5]) -> float:
-    # assert preds.size() == targets.size(), "the size of predict and target must be equal."
+def dice_with_norm_binary(preds: torch.Tensor, gts: torch.Tensor, tgt_channel: int,  is_softmax: bool = False, threshold: List[float] = [0.5]) -> float:
+    # assert preds.size() == gts.size(), "the size of predict and gt must be equal."
     if is_softmax:
         preds = softmax_binary_torch(preds)
     else:
@@ -132,17 +132,17 @@ def dice_with_norm_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channe
     for i in range(B):
 
         pred = preds[i, tgt_channel].flatten()
-        target = targets[i, tgt_channel].flatten()
+        gt = gts[i, tgt_channel].flatten()
 
-        intersection = (pred * target).sum()
-        union = (pred + target).sum() + eps
+        intersection = (pred * gt).sum()
+        union = (pred + gt).sum() + eps
 
         dice += (2. * intersection / union).item()
     return dice / B
 
 
-def dice_with_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int, is_softmax: bool = False, threshold: List[float] = [0.5]) -> float:
-    # assert preds.size() == targets.size(), "the size of predict and target must be equal."
+def dice_with_binary(preds: torch.Tensor, gts: torch.Tensor, tgt_channel: int, is_softmax: bool = False, threshold: List[float] = [0.5]) -> float:
+    # assert preds.size() == gts.size(), "the size of predict and gt must be equal."
     if is_softmax:
         preds = softmax_binary_torch(preds)
     else:
@@ -155,46 +155,13 @@ def dice_with_binary(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: in
     for i in range(B):
 
         pred = preds[i, tgt_channel].flatten()
-        target = targets[i, tgt_channel].flatten()
+        gt = gts[i, tgt_channel].flatten()
 
-        intersection = (pred * target).sum()
-        union = (pred + target).sum() + eps
+        intersection = (pred * gt).sum()
+        union = (pred + gt).sum() + eps
 
         dice += (2. * intersection / union).item()
     return dice / B
-
-
-def VOE(preds: torch.Tensor, targets: torch.Tensor, tgt_channel: int, is_softmax: bool = False, threshold: List[float] = [0.5]) -> float:
-    if is_softmax:
-        preds = softmax_binary_torch(preds)
-    else:
-        preds = torch.sigmoid(preds)
-        preds = torch.clamp(preds, min=1e-7, max=1).to(torch.float32)
-
-        preds = sigmoid_binary_torch(preds, threshold)
-
-    if threshold is not None:
-        if preds.size(1) == 1:
-            preds = torch.sigmoid(preds)
-        else:
-            preds = torch.softmax(preds, dim=1)
-        preds = torch.clamp(preds, min=1e-7, max=1).to(torch.float32)
-
-        preds[preds >= threshold] = 1
-        preds[preds < threshold] = 0
-
-    eps = 1e-5
-    B = preds.size(0)
-
-    pred = preds[:, tgt_channel].flatten()
-    target = targets[:, tgt_channel].flatten()
-
-    intersection = (pred * target).sum()
-    union = (pred + target).sum()
-
-    voe = (intersection / (union - intersection + eps)).item()
-    return voe / B
-
 
 if __name__ == "__main__":
     pred = torch.Tensor([[[
@@ -236,12 +203,12 @@ if __name__ == "__main__":
               [1, 0, 0, 1]]]]])
     # pred = torch.randn([2, 4, 4, 4, 4])
     # pred2 = torch.randn([2, 4, 4, 4, 4])
-    # target = torch.zeros([2, 1, 4, 4, 4])
-    # target[:, :, 1, 1, 1] = 1
-    # target[:, :, 2, 2, 2] = 1
-    # target[:, :, 0, 0, 0] = 1
-    # target[:, :, 1, 3, 3] = 1
-    # print(pred.shape, target.shape)
+    # gt = torch.zeros([2, 1, 4, 4, 4])
+    # gt[:, :, 1, 1, 1] = 1
+    # gt[:, :, 2, 2, 2] = 1
+    # gt[:, :, 0, 0, 0] = 1
+    # gt[:, :, 1, 3, 3] = 1
+    # print(pred.shape, gt.shape)
     print(pred.shape, gt.shape)
     print(dice_loss(pred, gt, tgt_channels=[1], in_detail=True))
     # rand = torch.ones([12, 224, 224])

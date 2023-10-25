@@ -1,14 +1,15 @@
 import sys
+from typing import List, Tuple
 
+import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
 import Config
 from models import models_3d
-from utils.AuxUtils import *
-from utils.LossUtils import *
-from utils.LogUtils import *
-from utils.DataUtils import *
+from utils.AuxUtils import AvgOutput, get_index, sliding_window_inference_3d
+from utils.LossUtils import dice_with_binary
+from utils.DataUtils import Dataset3D
 
 
 def test(test_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, crop_size: Tuple[int], device: str,
@@ -82,7 +83,7 @@ if __name__ == "__main__":
     model = model.to(device)
 
     if args.use_ckpt:
-        ckpt = torch.load(args.pre_ckpt_path)
+        ckpt = torch.load(args.ckpt_path)
         start_epoch = ckpt['epoch']
         model.load_state_dict(ckpt['model_state_dict'], strict=True)
     else:

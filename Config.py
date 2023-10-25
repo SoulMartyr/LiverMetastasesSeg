@@ -70,7 +70,7 @@ parser.add_argument('--ckpt_dir', type=str, default='./checkpoints',
                     help="checkpoint path for best weight")
 parser.add_argument('--use_ckpt', action='store_true',
                     help='use checkpoint to initial weight')
-parser.add_argument('--pre_ckpt_path', type=str,
+parser.add_argument('--ckpt_path', type=str,
                     default='./checkpoints/default/model.pth', help="pretrain checkpoint path")
 parser.add_argument('--overlap', default=0.5, type=float,
                     help='valid window slide overlap (default: 0.5)')

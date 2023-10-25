@@ -1,14 +1,17 @@
+import os
 from tqdm import tqdm
+from typing import List, Tuple
 
+import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
 import Config
 from models import models_3d
-from utils.AuxUtils import *
-from utils.LossUtils import *
-from utils.LogUtils import *
-from utils.DataUtils import *
+from utils.AuxUtils import predict_merge_channel_torch, set_pred_dir, get_index, sliding_window_inference_3d, save_predict_mask
+from utils.LossUtils import softmax_binary_torch, sigmoid_binary_torch
+from utils.LogUtils import get_month_and_day
+from utils.DataUtils import Dataset3D_Predict
 
 
 def predict(pred_loader: DataLoader, model: nn.Module, pred_dir: str, out_channels: int, crop_size: Tuple[int], device: str,
@@ -76,7 +79,7 @@ if __name__ == "__main__":
     model = model.to(device)
 
     if args.use_ckpt:
-        ckpt = torch.load(args.pre_ckpt_path)
+        ckpt = torch.load(args.ckpt_path)
         model.load_state_dict(ckpt['model_state_dict'], strict=True)
     else:
         raise RuntimeError("no use checkpoint")
