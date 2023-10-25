@@ -25,7 +25,7 @@ class DANet(SegBaseModel):
         "Dual Attention Network for Scene Segmentation." *CVPR*, 2019
     """
 
-    def __init__(self, in_channels=3, n_class=3, backbone='resnet34',  pretrained_base=False, dilated=False, **kwargs):
+    def __init__(self, in_channels=3, n_class=3, backbone='resnet34',  pretrained_base=True, dilated=False, **kwargs):
         super(DANet, self).__init__(
             backbone, pretrained_base=pretrained_base, dilated=dilated, **kwargs)
 

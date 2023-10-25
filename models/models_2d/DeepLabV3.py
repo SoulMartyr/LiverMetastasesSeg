@@ -26,7 +26,7 @@ class DeepLabV3(SegBaseModel):
         arXiv preprint arXiv:1706.05587 (2017).
     """
 
-    def __init__(self, in_channels=3, n_class=3, backbone='resnet34', pretrained_base=False, dilated=False, **kwargs):
+    def __init__(self, in_channels=3, n_class=3, backbone='resnet34', pretrained_base=True, dilated=False, **kwargs):
         super(DeepLabV3, self).__init__(
             backbone, pretrained_base=pretrained_base, dilated=dilated, **kwargs)
 

@@ -26,12 +26,12 @@ class PSPNet(SegBaseModel):
         "Pyramid scene parsing network." *CVPR*, 2017
     """
 
-    def __init__(self, in_channels=3, n_class=3, backbone='resnet34', pretrained_base=False, dilated=False, **kwargs):
+    def __init__(self, in_channels=3, n_class=3, backbone='resnet34', pretrained_base=True, dilated=False, **kwargs):
         super(PSPNet, self).__init__(
             backbone, pretrained_base=pretrained_base, dilated=dilated, **kwargs)
-        
+
         assert in_channels == 1 or in_channels == 3
-        
+
         self.head = _PSPHead(self.base_channel[-1], n_class, **kwargs)
 
     def forward(self, x):

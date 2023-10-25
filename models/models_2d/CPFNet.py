@@ -7,12 +7,12 @@ up_kwargs = {'mode': 'bilinear', 'align_corners': True}
 
 
 class CPFNet(SegBaseModel):
-    def __init__(self, in_channels=3, n_class=1, backbone="resnet34", pretrained_base=False, dilated=False, base_channel=32, **kwargs):
+    def __init__(self, in_channels=3, n_class=1, backbone="resnet34", pretrained_base=True, dilated=False, base_channel=32, **kwargs):
         super(CPFNet, self).__init__(
             backbone, pretrained_base=pretrained_base, dilated=dilated, **kwargs)
 
         assert in_channels == 1 or in_channels == 3
-        
+
         self.expansion = 2
         self.base_channel = base_channel
         if self.expansion == 4 and self.base_channel == 64:
