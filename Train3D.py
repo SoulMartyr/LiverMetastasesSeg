@@ -40,7 +40,7 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: i
                     pred, mask, channel, is_softmax, thres)
                 total_dice[idx].add(tmp_dice)
                 if not is_softmax:
-                    bacth_info += "thres:{} ".format(thres[idx])
+                    bacth_info += "Thres:{} ".format(thres[idx])
                 bacth_info += "Dice{}: {:.4f} ".format(idx, tmp_dice)
             logger_valid.info(bacth_info)
     except Exception as e:

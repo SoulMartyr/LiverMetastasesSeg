@@ -3,9 +3,11 @@ import random
 import torch.nn as nn
 import SimpleITK as sitk
 import numpy as np
+import collections
 import torch
 from typing import Tuple, Dict, Any
 from scipy import ndimage
+from torch.utils.data.dataloader import default_collate
 
 
 def tuple_sub(tuple1: Tuple[Any], tuple2: Tuple[Any]) -> Tuple[Any]:
@@ -269,6 +271,150 @@ class Dataset3D(nn.Module):
         mask_tensor = torch.FloatTensor(mask_array.copy())
 
         return {"index": self.index_list[index].split('.')[0], "img": img_tensor, "mask": mask_tensor}
+
+
+class Dataset2D_Test(nn.Module):
+    def __init__(self, data_path: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
+                 crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
+        super(Dataset2D_Test, self).__init__()
+        assert num_classes == 1 or num_classes == 2, "Num Classes should be 1 or 2"
+        assert norm in ["zscore",
+                        "minmax"], "norm should be \'zscore\' or \'minmax\'"
+
+        self.data_path = data_path
+        self.image_dir = image_dir
+        self.mask_dir = mask_dir
+        self.index_list = index_list
+        self.is_train = is_train
+        self.num_classes = num_classes
+        self.crop_size = crop_size
+        self.norm = norm
+        self.dhw = dhw
+        self.is_keyframe = is_keyframe
+        self.is_softmax = is_softmax
+        self.is_flip = is_flip
+
+    def __len__(self) -> int:
+        return len(self.index_list)
+
+    def __getitem__(self, index) -> Dict:
+
+        img = sitk.ReadImage(os.path.join(
+            self.data_path, self.image_dir, self.index_list[index]), sitk.sitkInt32)
+        mask = sitk.ReadImage(os.path.join(
+            self.data_path, self.mask_dir, self.index_list[index]), sitk.sitkUInt8)
+
+        img_array = sitk.GetArrayFromImage(img)
+        mask_array = sitk.GetArrayFromImage(mask)
+
+        assert len(np.unique(
+            mask_array).tolist()) == self.num_classes + 1, "numbers in mask dont equal to num classes"
+
+        nonzero_layers = np.nonzero(img_array.sum(axis=(1, 2)))[0]
+        img_array = img_array[nonzero_layers]
+        mask_array = mask_array[nonzero_layers]
+
+        if self.norm == "zscore":
+            img_array = z_score_norm_2d_numpy(img_array, nonzero=True)
+        elif self.norm == "minmax":
+            img_array = min_max_norm_2d_numpy(img_array)
+
+        img_array = resize_dhw_numpy(img_array, order=3, dhw=self.dhw)
+        mask_array = resize_dhw_numpy(mask_array, order=0, dhw=self.dhw)
+
+        if self.is_train:
+            img_array, mask_array = random_crop_numpy(
+                img_array, mask_array, crop_size=self.crop_size, is_keyframe=self.is_keyframe)
+
+            if self.is_flip:
+                img_array, mask_array = augmentation(img_array, mask_array)
+
+        mask_array = ont_hot_mask_numpy(
+            mask_array, num_classes=self.num_classes, is_softmax=self.is_softmax)
+
+        img_tensor = torch.FloatTensor(img_array.copy())
+        mask_tensor = torch.FloatTensor(mask_array.copy())
+        if self.is_train:
+            img_tensor = img_tensor.unsqueeze(1)
+            mask_tensor = mask_tensor.permute(1, 0, 2, 3)
+        else:
+            img_tensor = img_tensor.unsqueeze(0)
+        return {"index": self.index_list[index].split('.')[0], "img": img_tensor, "mask": mask_tensor, "spacing": img.GetSpacing()}
+
+
+class Dataset3D_Test(nn.Module):
+    def __init__(self, data_path: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
+                 crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
+        super(Dataset3D_Test, self).__init__()
+
+        assert num_classes == 1 or num_classes == 2, "Num Classes should be 1 or 2"
+        assert norm in ["zscore",
+                        "minmax"], "norm should be \'zscore\' or \'minmax\'"
+
+        self.data_path = data_path
+        self.image_dir = image_dir
+        self.mask_dir = mask_dir
+        self.index_list = index_list
+        self.is_train = is_train
+        self.num_classes = num_classes
+        self.crop_size = crop_size
+        self.norm = norm
+        self.dhw = dhw
+        self.is_keyframe = is_keyframe
+        self.is_softmax = is_softmax
+        self.is_flip = is_flip
+
+    def __len__(self) -> int:
+        return len(self.index_list)
+
+    def __getitem__(self, index) -> Dict:
+
+        img = sitk.ReadImage(os.path.join(
+            self.data_path, self.image_dir, self.index_list[index]), sitk.sitkInt32)
+        mask = sitk.ReadImage(os.path.join(
+            self.data_path, self.mask_dir, self.index_list[index]), sitk.sitkUInt8)
+
+        img_array = sitk.GetArrayFromImage(img)
+        mask_array = sitk.GetArrayFromImage(mask)
+
+        assert len(np.unique(
+            mask_array).tolist()) == self.num_classes + 1, "numbers in mask dont equal to num classes"
+
+        nonzero_layers = np.nonzero(img_array.sum(axis=(1, 2)))[0]
+        img_array = img_array[nonzero_layers]
+        mask_array = mask_array[nonzero_layers]
+
+        if self.norm == "zscore":
+            img_array = z_score_norm_3d_numpy(img_array, nonzero=True)
+        elif self.norm == "minmax":
+            img_array = min_max_norm_3d_numpy(img_array)
+
+        img_array = resize_dhw_numpy(img_array, order=3, dhw=self.dhw)
+        mask_array = resize_dhw_numpy(mask_array, order=0, dhw=self.dhw)
+
+        if self.is_train:
+            img_array, mask_array = random_crop_numpy(
+                img_array, mask_array, crop_size=self.crop_size, is_keyframe=self.is_keyframe)
+            if self.is_flip:
+                img_array, mask_array = augmentation(img_array, mask_array)
+
+        mask_array = ont_hot_mask_numpy(
+            mask_array, num_classes=self.num_classes, is_softmax=self.is_softmax)
+
+        img_tensor = torch.FloatTensor(img_array.copy()).unsqueeze(0)
+        mask_tensor = torch.FloatTensor(mask_array.copy())
+
+        return {"index": self.index_list[index].split('.')[0], "img": img_tensor, "mask": mask_tensor, "spacing": img.GetSpacing()}
+
+
+def keep_tuple_collate_fn(batch):
+    elem = batch[0]
+    if isinstance(elem, collections.abc.Mapping):
+        return {key: keep_tuple_collate_fn([d[key] for d in batch]) for key in elem}
+    elif isinstance(elem, tuple):
+        return batch
+    else:
+        return default_collate(batch)
 
 
 class Dataset2D_Predict(nn.Module):

@@ -81,6 +81,10 @@ parser.add_argument('--thres1', type=float, default=0.5,
 parser.add_argument('--thres2', type=float, default=0.5,
                     help='threshold for judging second class(default: 0.5)')
 
+# metrics
+parser.add_argument('--metrics',  type=str,  nargs='+',
+                    default=["dice", "voe", "rvd", "asd"], help='metrics type')
+
 # predict
 parser.add_argument('--pred_dir', type=str, default='./predicts',
                     help='predict mask directory')

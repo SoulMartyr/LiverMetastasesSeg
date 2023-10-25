@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
-from typing import List, Tuple, Sequence
+from typing import List, Tuple, Sequence, Union
 import torch
 from torch import optim, nn
 from torch.nn import functional as F
@@ -54,19 +54,32 @@ def save_weight(ckpt_dir: str, epoch: int, model: nn.Module, optimizer: optim.Op
 
 
 class AvgOutput(object):
-    def __init__(self) -> None:
-        self.sum = 0.
+    def __init__(self, length: int = 0) -> None:
+        self.length = length
+        if length == 0:
+            self.sum = 0.
+        else:
+            self.sum = [0 for _ in range(length)]
         self.count = 0
 
-    def add(self, x: float) -> None:
-        self.sum += x
+    def add(self, x: Union[float, List[float]]) -> None:
+        if self.length == 0:
+            self.sum += x
+        else:
+            self.sum = [x + y for x, y in zip(self.sum, x)]
         self.count += 1
 
     def avg(self) -> float:
-        return self.sum / self.count
+        if self.length == 0:
+            return self.sum / self.count
+        else:
+            return [x / self.count for x in self.sum]
 
     def clear(self) -> None:
-        self.sum = 0.
+        if self.length == 0:
+            self.sum = 0.
+        else:
+            self.sum = [0 for _ in range(self.length)]
         self.count = 0
 
 
