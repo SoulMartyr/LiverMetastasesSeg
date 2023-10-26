@@ -244,8 +244,8 @@ class ProjectionHead(nn.Module):
 #         return out
 
 
-class UXNET3D(nn.Module):
-    name = "UXNET3D"
+class UXNet3D(nn.Module):
+    name = "UXNet3D"
 
     def __init__(
         self,
@@ -462,5 +462,5 @@ class UXNET3D(nn.Module):
 
 if __name__ == "__main__":
     a = torch.randn(1, 1, 64, 224, 224)
-    model = UXNET3D()
+    model = UXNet3D()
     print(model(a).shape)

@@ -14,17 +14,20 @@ def get_month_and_day() -> Tuple[int]:
     return cur_month, cur_day
 
 
-def set_logdir(log_path: str, file_dir: str, fold: int, is_lock: bool) -> str:
-    log_dir = os.path.join(log_path, file_dir, "fold{}".format(fold))
-    if os.path.exists(log_dir):
-        if not os.path.exists(os.path.join(log_dir, "lock.txt")):
-            shutil.rmtree(log_dir)
+def set_log_fold_dir(log_dir: str, log_folder: str, fold: int, is_lock: bool) -> str:
+    log_fold_dir = os.path.join(log_dir, log_folder, "fold{}".format(fold))
+
+    if os.path.exists(log_fold_dir):
+        if not os.path.exists(os.path.join(log_fold_dir, "lock.txt")):
+            shutil.rmtree(log_fold_dir)
         else:
             raise RuntimeError("Create Log Dir failed")
-    os.makedirs(log_dir)
+    os.makedirs(log_fold_dir)
+
     if is_lock:
-        open(os.path.join(log_dir, "lock.txt"), "w").close()
-    return log_dir
+        open(os.path.join(log_fold_dir, "lock.txt"), "w").close()
+
+    return log_fold_dir
 
 
 def log_init(log_dir: str, fold: int, mode: str) -> logging.Logger:

@@ -329,7 +329,7 @@ class SwinUNet(nn.Module):
         self.load_ckpt()
 
     def load_ckpt(self):
-        pretrained_path = "checkpoints/pretrain/swin_tiny_patch4_window7_224.pth"
+        pretrained_path = "checkpoints/swin_tiny_patch4_window7_224.pth"
         if pretrained_path is not None:
             device = 'cpu'
             pretrained_dict = torch.load(pretrained_path, map_location=device)

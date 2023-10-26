@@ -140,14 +140,14 @@ def augmentation(img_array: np.ndarray, mask_array: np.ndarray) -> Tuple[np.ndar
 
 
 class Dataset2D(nn.Module):
-    def __init__(self, data_path: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
+    def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
                  crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
         super(Dataset2D, self).__init__()
         assert num_classes == 1 or num_classes == 2, "Num Classes should be 1 or 2"
         assert norm in ["zscore",
                         "minmax"], "norm should be \'zscore\' or \'minmax\'"
 
-        self.data_path = data_path
+        self.data_dir = data_dir
         self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.index_list = index_list
@@ -166,9 +166,9 @@ class Dataset2D(nn.Module):
     def __getitem__(self, index) -> Dict:
 
         img = sitk.ReadImage(os.path.join(
-            self.data_path, self.image_dir, self.index_list[index]), sitk.sitkInt32)
+            self.data_dir, self.image_dir, self.index_list[index]), sitk.sitkInt32)
         mask = sitk.ReadImage(os.path.join(
-            self.data_path, self.mask_dir, self.index_list[index]), sitk.sitkUInt8)
+            self.data_dir, self.mask_dir, self.index_list[index]), sitk.sitkUInt8)
 
         img_array = sitk.GetArrayFromImage(img)
         mask_array = sitk.GetArrayFromImage(mask)
@@ -209,7 +209,7 @@ class Dataset2D(nn.Module):
 
 
 class Dataset3D(nn.Module):
-    def __init__(self, data_path: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
+    def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
                  crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
         super(Dataset3D, self).__init__()
 
@@ -217,7 +217,7 @@ class Dataset3D(nn.Module):
         assert norm in ["zscore",
                         "minmax"], "norm should be \'zscore\' or \'minmax\'"
 
-        self.data_path = data_path
+        self.data_dir = data_dir
         self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.index_list = index_list
@@ -236,9 +236,9 @@ class Dataset3D(nn.Module):
     def __getitem__(self, index) -> Dict:
 
         img = sitk.ReadImage(os.path.join(
-            self.data_path, self.image_dir, self.index_list[index]), sitk.sitkInt32)
+            self.data_dir, self.image_dir, self.index_list[index]), sitk.sitkInt32)
         mask = sitk.ReadImage(os.path.join(
-            self.data_path, self.mask_dir, self.index_list[index]), sitk.sitkUInt8)
+            self.data_dir, self.mask_dir, self.index_list[index]), sitk.sitkUInt8)
 
         img_array = sitk.GetArrayFromImage(img)
         mask_array = sitk.GetArrayFromImage(mask)
@@ -274,14 +274,14 @@ class Dataset3D(nn.Module):
 
 
 class Dataset2D_Test(nn.Module):
-    def __init__(self, data_path: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
+    def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
                  crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
         super(Dataset2D_Test, self).__init__()
         assert num_classes == 1 or num_classes == 2, "Num Classes should be 1 or 2"
         assert norm in ["zscore",
                         "minmax"], "norm should be \'zscore\' or \'minmax\'"
 
-        self.data_path = data_path
+        self.data_dir = data_dir
         self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.index_list = index_list
@@ -300,9 +300,9 @@ class Dataset2D_Test(nn.Module):
     def __getitem__(self, index) -> Dict:
 
         img = sitk.ReadImage(os.path.join(
-            self.data_path, self.image_dir, self.index_list[index]), sitk.sitkInt32)
+            self.data_dir, self.image_dir, self.index_list[index]), sitk.sitkInt32)
         mask = sitk.ReadImage(os.path.join(
-            self.data_path, self.mask_dir, self.index_list[index]), sitk.sitkUInt8)
+            self.data_dir, self.mask_dir, self.index_list[index]), sitk.sitkUInt8)
 
         img_array = sitk.GetArrayFromImage(img)
         mask_array = sitk.GetArrayFromImage(mask)
@@ -343,7 +343,7 @@ class Dataset2D_Test(nn.Module):
 
 
 class Dataset3D_Test(nn.Module):
-    def __init__(self, data_path: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
+    def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
                  crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
         super(Dataset3D_Test, self).__init__()
 
@@ -351,7 +351,7 @@ class Dataset3D_Test(nn.Module):
         assert norm in ["zscore",
                         "minmax"], "norm should be \'zscore\' or \'minmax\'"
 
-        self.data_path = data_path
+        self.data_dir = data_dir
         self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.index_list = index_list
@@ -370,9 +370,9 @@ class Dataset3D_Test(nn.Module):
     def __getitem__(self, index) -> Dict:
 
         img = sitk.ReadImage(os.path.join(
-            self.data_path, self.image_dir, self.index_list[index]), sitk.sitkInt32)
+            self.data_dir, self.image_dir, self.index_list[index]), sitk.sitkInt32)
         mask = sitk.ReadImage(os.path.join(
-            self.data_path, self.mask_dir, self.index_list[index]), sitk.sitkUInt8)
+            self.data_dir, self.mask_dir, self.index_list[index]), sitk.sitkUInt8)
 
         img_array = sitk.GetArrayFromImage(img)
         mask_array = sitk.GetArrayFromImage(mask)
@@ -418,12 +418,12 @@ def keep_tuple_collate_fn(batch):
 
 
 class Dataset2D_Predict(nn.Module):
-    def __init__(self, data_path: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224)) -> None:
+    def __init__(self, data_dir: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224)) -> None:
         super(Dataset2D_Predict, self).__init__()
         assert norm in ["zscore",
                         "minmax"], "norm should be \'zscore\' or \'minmax\'"
 
-        self.data_path = data_path
+        self.data_dir = data_dir
         self.image_dir = image_dir
         self.index_list = index_list
         self.norm = norm
@@ -434,7 +434,7 @@ class Dataset2D_Predict(nn.Module):
 
     def __getitem__(self, index) -> Dict:
         img_path = os.path.join(
-            self.data_path, self.image_dir, self.index_list[index])
+            self.data_dir, self.image_dir, self.index_list[index])
         img = sitk.ReadImage(img_path, sitk.sitkInt32)
 
         img_array = sitk.GetArrayFromImage(img)
@@ -452,13 +452,13 @@ class Dataset2D_Predict(nn.Module):
 
 
 class Dataset3D_Predict(nn.Module):
-    def __init__(self, data_path: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224)) -> None:
+    def __init__(self, data_dir: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224)) -> None:
         super(Dataset3D_Predict, self).__init__()
 
         assert norm in ["zscore",
                         "minmax"], "norm should be \'zscore\' or \'minmax\'"
 
-        self.data_path = data_path
+        self.data_dir = data_dir
         self.image_dir = image_dir
         self.index_list = index_list
         self.norm = norm
@@ -469,7 +469,7 @@ class Dataset3D_Predict(nn.Module):
 
     def __getitem__(self, index) -> Dict:
         img_path = os.path.join(
-            self.data_path, self.image_dir, self.index_list[index])
+            self.data_dir, self.image_dir, self.index_list[index])
         img = sitk.ReadImage(img_path, sitk.sitkInt32)
 
         img_array = sitk.GetArrayFromImage(img)
@@ -499,8 +499,8 @@ if __name__ == "__main__":
             train_patients.extend(index_df.loc[i, "index"].strip().split(" "))
     test_patients = index_df.loc[fold, "index"].strip().split(" ")
 
-    data_path = 'data/resection_V'
-    train_dataset = Dataset2D(data_path=data_path, image_dir="images", mask_dir="liver_tumor_masks",
+    data_dir = 'data/resection_V'
+    train_dataset = Dataset2D(data_dir=data_dir, image_dir="images", mask_dir="liver_tumor_masks",
                               index_list=train_patients, is_train=True, num_classes=2, crop_size=(32, 224, 224), norm="zscore", dhw=(-1, 224, 224), is_keyframe=True, is_softmax=True, is_flip=False)
 
     dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)

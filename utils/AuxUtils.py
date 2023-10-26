@@ -33,13 +33,6 @@ def get_learning_rate(optimizer: optim.Optimizer) -> float:
     return lr
 
 
-def set_ckpt_dir(ckpt_dir: str, log_file: str, fold: int) -> str:
-    ckpt_dir = os.path.join(ckpt_dir, log_file, "fold{}".format(fold))
-    if not os.path.exists(ckpt_dir):
-        os.makedirs(ckpt_dir)
-    return ckpt_dir
-
-
 def save_weight(ckpt_dir: str, epoch: int, model: nn.Module, optimizer: optim.Optimizer, scheduler: optim.lr_scheduler._LRScheduler):
     if isinstance(model, nn.DataParallel):
         model = model.module
@@ -117,7 +110,7 @@ def _get_scan_interval(
     return tuple(scan_interval)
 
 
-def sliding_window_inference_2d(inputs: torch.Tensor, crop_size: Tuple[int],  model: nn.Module, outputs_size: Tuple[int], is_softmax: bool) -> torch.Tensor:
+def sliding_window_inference_2d(inputs: torch.Tensor, crop_size: Tuple[int],  model: nn.Module, outputs_size: torch.Size, is_softmax: bool) -> torch.Tensor:
     num_spatial_dims = len(inputs.shape) - 2
 
     # determine image spatial size and batch size
@@ -168,7 +161,7 @@ def sliding_window_inference_2d(inputs: torch.Tensor, crop_size: Tuple[int],  mo
     return outputs / count
 
 
-def sliding_window_inference_3d(inputs: torch.Tensor, crop_size: Tuple[int],  model: nn.Module, outputs_size: Tuple[int], is_softmax: bool, overlap: float = 0.5) -> torch.Tensor:
+def sliding_window_inference_3d(inputs: torch.Tensor, crop_size: Tuple[int],  model: nn.Module, outputs_size: torch.Size, is_softmax: bool, overlap: float = 0.5) -> torch.Tensor:
     num_spatial_dims = len(inputs.shape) - 2
     if overlap < 0 or overlap >= 1:
         raise ValueError("overlap must be >= 0 and < 1.")

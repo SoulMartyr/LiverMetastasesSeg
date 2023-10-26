@@ -66,8 +66,6 @@ parser.add_argument('--log_folder', type=str,
                     default="default", help='log folder name')
 parser.add_argument('--lock', action='store_true',
                     help='lock log dir to avoid accidental deletion')
-parser.add_argument('--ckpt_dir', type=str, default='./checkpoints',
-                    help="checkpoint path for best weight")
 parser.add_argument('--use_ckpt', action='store_true',
                     help='use checkpoint to initial weight')
 parser.add_argument('--ckpt_path', type=str,

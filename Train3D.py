@@ -9,18 +9,20 @@ from torch.utils.tensorboard import SummaryWriter
 
 import Config
 from models import models_3d
-from utils.AuxUtils import AvgOutput, set_ckpt_dir, get_index, get_learning_rate, save_weight, sliding_window_inference_3d
-from utils.LossUtils import dice_with_norm_binary, dice_with_binary, bce_loss, ce_loss, dice_loss
-from utils.LogUtils import get_month_and_day, set_logdir, save_args, log_init
 from utils.DataUtils import Dataset3D
+from utils.MetricsUtils import binary_torch, dice_torch
+from utils.LossUtils import dice_with_norm_binary, bce_loss, ce_loss, dice_loss
+from utils.LogUtils import get_month_and_day, set_log_fold_dir, save_args, log_init
+from utils.AuxUtils import AvgOutput, get_index, get_learning_rate, save_weight, sliding_window_inference_3d
 
 
 def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, crop_size: Tuple[int], device: str,
           is_softmax: bool, overlap: float, thres: List[float], logger_valid: logging.Logger) -> float:
     logger_valid.info("Epoch: {}".format(epoch))
-    model.eval()
     total_dice = [AvgOutput() for _ in range(0, num_classes)]
+
     try:
+        model.eval()
         for _, batch in enumerate(valid_loader):
             index = batch["index"][0]
             img = batch['img'].to(device)
@@ -29,29 +31,35 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: i
             with torch.no_grad():
                 pred = sliding_window_inference_3d(
                     img, crop_size, model, mask.size(), is_softmax, overlap)
+                pred = binary_torch(pred, is_softmax, thres)
+                pred, mask = pred.squeeze(0), mask.squeeze(0)
 
-            bacth_info = "index:{} ".format(index)
-            if is_softmax:
-                channel_range = [i for i in range(1, num_classes+1)]
-            else:
-                channel_range = [i for i in range(0, num_classes)]
+            bacth_info = "Index:{} ".format(index)
+
+            channel_range = [i if not is_softmax else i +
+                             1 for i in range(0, num_classes)]
+
             for idx, channel in enumerate(channel_range):
-                tmp_dice = dice_with_binary(
-                    pred, mask, channel, is_softmax, thres)
-                total_dice[idx].add(tmp_dice)
+                dice = dice_torch(pred, mask, channel)
+
                 if not is_softmax:
                     bacth_info += "Thres:{} ".format(thres[idx])
-                bacth_info += "Dice{}: {:.4f} ".format(idx, tmp_dice)
+                bacth_info += "DICE{}: {:.4f} ".format(idx, dice)
+                total_dice[idx].add(dice)
+
             logger_valid.info(bacth_info)
+
     except Exception as e:
         logger_valid.error(e, exc_info=True)
         sys.exit()
 
     total_info = "Mean: "
     for idx in range(0, num_classes):
-        total_info += "Dice{}: {:.4f} ".format(idx, total_dice[idx].avg())
+        total_info += "DICE{}: {:.4f} ".format(idx, total_dice[idx].avg())
     logger_valid.info(total_info)
+
     model.train()
+
     return total_dice[-1].avg()
 
 
@@ -129,16 +137,15 @@ if __name__ == "__main__":
     args = Config.args
     for fold in args.fold:
         cur_month, cur_day = get_month_and_day()
-        file_dir = str(cur_month) + str(cur_day) + "_" + \
+        log_folder = str(cur_month) + str(cur_day) + "_" + \
             args.log_folder
 
-        log_dir_fold = set_logdir(
-            args.log_dir, file_dir, fold, is_lock=args.lock)
-        save_args(args, log_dir_fold)
-        logger_train = log_init(log_dir_fold, fold, mode="train")
-        logger_valid = log_init(log_dir_fold, fold, mode="valid")
-        writer = SummaryWriter(log_dir=log_dir_fold)
-        ckpt_dir = set_ckpt_dir(args.ckpt_dir, file_dir, fold)
+        log_fold_dir = set_log_fold_dir(
+            args.log_dir, log_folder, fold, is_lock=args.lock)
+        save_args(args, log_fold_dir)
+        logger_train = log_init(log_fold_dir, fold, mode="train")
+        logger_valid = log_init(log_fold_dir, fold, mode="valid")
+        writer = SummaryWriter(log_dir=log_fold_dir)
         logger_train.info("Init Success")
 
         # Dataset
@@ -146,10 +153,10 @@ if __name__ == "__main__":
                                 f for f in range(5) if f != fold])
         valid_index = get_index(args.index_path, fold=[fold])
 
-        train_dataset_args = {"data_path": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": train_index, "is_train": True, "num_classes": args.num_classes,
+        train_dataset_args = {"data_dir": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": train_index, "is_train": True, "num_classes": args.num_classes,
                               "crop_size": (args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_flip": args.flip}
-        valid_dataset_args = {"data_path": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": valid_index, "is_train": False, "num_classes": args.num_classes,
-                              "crop_size": (args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_flip": args.flip}
+        valid_dataset_args = {"data_dir": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": valid_index, "is_train": False, "num_classes": args.num_classes,
+                              "crop_size": (args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_flip": False}
 
         train_dataset = Dataset3D(**train_dataset_args)
         valid_dataset = Dataset3D(**valid_dataset_args)
@@ -196,7 +203,7 @@ if __name__ == "__main__":
                 optimizer, 10, eta_min=1e-7)
         else:
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer, args.epochs + 10)
+                optimizer, args.epoch_num + 10)
 
         if args.use_ckpt:
             ckpt = torch.load(args.ckpt_path)
@@ -205,7 +212,7 @@ if __name__ == "__main__":
             optimizer.load_state_dict(ckpt['optim_state_dict'])
             scheduler.load_state_dict(ckpt['sched_state_dict'])
         else:
-            start_epoch = 0
+            start_epoch = 1
 
         logger_train.info("Load Model\Optimizer\Scheduler Success")
 
@@ -222,7 +229,7 @@ if __name__ == "__main__":
         valid_args = {"model": model, "device": device, "thres": thres, "valid_loader": valid_loader, "num_classes": args.num_classes, "epoch": start_epoch,
                       "crop_size": (args.roi_z, args.roi_y, args.roi_x), "logger_valid": logger_valid, "is_softmax": args.softmax, "overlap": args.overlap}
         train_args = {"model": model, "device": device, "thres": thres, "train_loader": train_loader, "optimizer": optimizer, "scheduler": scheduler, "is_softmax": args.softmax, "epoch_num": args.epoch_num, "weight": weight,
-                      "start_epoch": start_epoch, "log_iter": args.log_iter, "valid_epoch": args.valid_epoch, "ckpt_dir": ckpt_dir, "logger_train": logger_train, "writer": writer, "valid_args": valid_args}
+                      "start_epoch": start_epoch, "log_iter": args.log_iter, "valid_epoch": args.valid_epoch, "ckpt_dir": log_fold_dir, "logger_train": logger_train, "writer": writer, "valid_args": valid_args}
         best_result = train(**train_args)
         logger_valid.info("Best Dice: {}".format(str(best_result)))
 

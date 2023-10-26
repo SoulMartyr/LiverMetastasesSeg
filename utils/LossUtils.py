@@ -126,9 +126,9 @@ def dice_with_norm_binary(preds: torch.Tensor, gts: torch.Tensor, tgt_channel: i
         preds = sigmoid_binary_torch(preds, threshold)
 
     eps = 1e-5
-
     B = preds.size(0)
     dice = 0.
+    
     for i in range(B):
 
         pred = preds[i, tgt_channel].flatten()
@@ -138,30 +138,9 @@ def dice_with_norm_binary(preds: torch.Tensor, gts: torch.Tensor, tgt_channel: i
         union = (pred + gt).sum() + eps
 
         dice += (2. * intersection / union).item()
+        
     return dice / B
 
-
-def dice_with_binary(preds: torch.Tensor, gts: torch.Tensor, tgt_channel: int, is_softmax: bool = False, threshold: List[float] = [0.5]) -> float:
-    # assert preds.size() == gts.size(), "the size of predict and gt must be equal."
-    if is_softmax:
-        preds = softmax_binary_torch(preds)
-    else:
-        preds = sigmoid_binary_torch(preds, threshold)
-
-    eps = 1e-5
-
-    B = preds.size(0)
-    dice = 0.
-    for i in range(B):
-
-        pred = preds[i, tgt_channel].flatten()
-        gt = gts[i, tgt_channel].flatten()
-
-        intersection = (pred * gt).sum()
-        union = (pred + gt).sum() + eps
-
-        dice += (2. * intersection / union).item()
-    return dice / B
 
 if __name__ == "__main__":
     pred = torch.Tensor([[[

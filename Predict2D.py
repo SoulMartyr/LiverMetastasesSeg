@@ -8,10 +8,10 @@ from torch.utils.data import DataLoader
 
 import Config
 from models import models_2d
-from utils.AuxUtils import predict_merge_channel_torch, set_pred_dir, get_index, sliding_window_inference_2d, save_predict_mask
-from utils.LossUtils import softmax_binary_torch, sigmoid_binary_torch
-from utils.LogUtils import get_month_and_day
 from utils.DataUtils import Dataset2D_Predict
+from utils.MetricsUtils import binary_torch
+from utils.LogUtils import get_month_and_day
+from utils.AuxUtils import predict_merge_channel_torch, set_pred_dir, get_index, sliding_window_inference_2d, save_predict_mask
 
 
 def predict(pred_loader: DataLoader, model: nn.Module, pred_dir: str, out_channels: int, crop_size: Tuple[int], device: str,
@@ -28,12 +28,8 @@ def predict(pred_loader: DataLoader, model: nn.Module, pred_dir: str, out_channe
             pred = sliding_window_inference_2d(
                 img, crop_size, model, outputs_size, is_softmax)
 
-        if is_softmax:
-            pred = softmax_binary_torch(pred)
-        else:
-            pred = sigmoid_binary_torch(pred, thres)
-        mask_tensor = predict_merge_channel_torch(
-            pred.squeeze(0), is_softmax)
+        pred = binary_torch(pred, is_softmax, thres)
+        mask_tensor = predict_merge_channel_torch(pred.squeeze(0), is_softmax)
 
         if mask_tensor.is_cuda:
             mask_tensor = mask_tensor.cpu()
@@ -46,16 +42,16 @@ if __name__ == "__main__":
     args = Config.args
 
     assert len(args.fold) == 1, "predict only support 1 fold once"
-    fold = args.fold[0]
+    fold = args.fold
 
     cur_month, cur_day = get_month_and_day()
     file_dir = str(cur_month) + str(cur_day) + "_" + args.log_folder
 
-    pred_dir = set_pred_dir(args.pred_dir, file_dir, fold)
+    pred_dir = set_pred_dir(args.pred_dir, file_dir, fold[0])
 
-    pred_index = get_index(args.index_path, fold=[fold])
+    pred_index = get_index(args.index_path, fold=fold)
 
-    pred_dataset_args = {"data_path": args.data_dir, "image_dir": args.image_dir,
+    pred_dataset_args = {"data_dir": args.data_dir, "image_dir": args.image_dir,
                          "index_list": pred_index,  "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w)}
 
     pred_dataset = Dataset2D_Predict(**pred_dataset_args)
