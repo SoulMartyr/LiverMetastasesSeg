@@ -95,7 +95,7 @@ if __name__ == "__main__":
     model = model.to(device)
 
     ckpt_path = get_ckpt_path(log_fold_dir)
-    ckpt = torch.load(ckpt_path)
+    ckpt = torch.load(ckpt_path, map_location=device)
     start_epoch = ckpt['epoch']
     model.load_state_dict(ckpt['model_state_dict'], strict=True)
 

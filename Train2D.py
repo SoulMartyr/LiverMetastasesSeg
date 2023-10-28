@@ -13,7 +13,7 @@ from utils.DataUtils import Dataset2D
 from utils.MetricsUtils import binary_torch, dice_torch
 from utils.LossUtils import dice_with_norm_binary, bce_loss, ce_loss, dice_loss
 from utils.LogUtils import get_month_and_day, set_log_fold_dir, save_args, log_init
-from utils.AuxUtils import AvgOutput, get_index, get_learning_rate, save_weight, sliding_window_inference_2d
+from utils.AuxUtils import AvgOutput, get_index, get_learning_rate, get_ckpt_path, save_weight, sliding_window_inference_2d
 
 
 def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, crop_size: Tuple[int], device: str,
@@ -210,7 +210,8 @@ if __name__ == "__main__":
                 optimizer, args.epoch_num + 10)
 
         if args.use_ckpt:
-            ckpt = torch.load(args.ckpt_path)
+            ckpt_path = get_ckpt_path(log_fold_dir)
+            ckpt = torch.load(ckpt_path, map_location=device)            
             start_epoch = ckpt['epoch']
             model.module.load_state_dict(ckpt['model_state_dict'], strict=True)
             optimizer.load_state_dict(ckpt['optim_state_dict'])

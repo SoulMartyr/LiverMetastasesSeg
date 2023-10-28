@@ -15,7 +15,6 @@ from utils.AuxUtils import AvgOutput, get_args, get_index, get_ckpt_path, slidin
 def test(test_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, crop_size: Tuple[int], device: str,
          is_softmax: bool, thres: List[float], metrics_types: List[str]) -> float:
     print("Epoch: {}".format(epoch))
-    model.eval()
     total_metrics = [AvgOutput(length=len(metrics_types))
                      for _ in range(0, num_classes)]
     metrics = Metrics(metrics_types)
@@ -96,7 +95,7 @@ if __name__ == "__main__":
     model = model.to(device)
 
     ckpt_path = get_ckpt_path(log_fold_dir)
-    ckpt = torch.load(ckpt_path)
+    ckpt = torch.load(ckpt_path, map_location=device)
     start_epoch = ckpt['epoch']
     model.load_state_dict(ckpt['model_state_dict'], strict=True)
 
