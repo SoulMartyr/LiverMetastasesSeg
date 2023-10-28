@@ -10,10 +10,8 @@ import Config
 from models import models_3d
 from utils.DataUtils import Dataset3D_Predict
 from utils.MetricsUtils import binary_torch
-from utils.LogUtils import get_month_and_day
-from utils.AuxUtils import predict_merge_channel_torch, set_pred_dir, get_index, sliding_window_inference_3d, save_predict_mask
-
-
+from utils.LogUtils import get_month_and_day, get_log_fold_dir
+from utils.AuxUtils import get_args, get_ckpt_path, predict_merge_channel_torch, set_pred_dir, get_index, sliding_window_inference_3d, save_predict_mask
 
 
 def predict(pred_loader: DataLoader, model: nn.Module, pred_dir: str, out_channels: int, crop_size: Tuple[int], device: str,
@@ -51,10 +49,14 @@ if __name__ == "__main__":
 
     pred_dir = set_pred_dir(args.pred_dir, file_dir, fold[0])
 
-    pred_index = get_index(args.index_path, fold=fold)
+    log_fold_dir = get_log_fold_dir(args.log_dir, args.log_folder, fold[0])
 
-    pred_dataset_args = {"data_dir": args.data_dir, "image_dir": args.image_dir,
-                         "index_list": pred_index,  "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w)}
+    args_dict = get_args(log_fold_dir)
+
+    pred_index = get_index(args_dict["index_path"], fold=fold)
+
+    pred_dataset_args = {"data_dir": args_dict["data_dir"], "image_dir": args_dict["image_dir"],
+                         "index_list": pred_index,  "norm": args_dict["norm"], "dhw": (args_dict["img_d"], args_dict["img_h"], args_dict["img_w"])}
 
     pred_dataset = Dataset3D_Predict(**pred_dataset_args)
 
@@ -63,12 +65,12 @@ if __name__ == "__main__":
 
     pred_loader = DataLoader(**pred_dataloader_args)
 
-    model_maker = getattr(models_3d, args.model)
-    if args.softmax:
-        out_channels = args.num_classes + 1
+    model_maker = getattr(models_3d, args_dict["model"])
+    if args_dict["softmax"]:
+        out_channels = args_dict["num_classes"] + 1
     else:
-        out_channels = args.num_classes
-    model = model_maker(args.in_channels, out_channels)
+        out_channels = args_dict["num_classes"]
+    model = model_maker(args_dict["in_channels"], out_channels)
     if args.gpu:
         gpus = args.devices
         assert len(gpus) == 1, "predict should use single device"
@@ -77,17 +79,16 @@ if __name__ == "__main__":
         device = torch.device("cpu")
     model = model.to(device)
 
-    if args.use_ckpt:
-        ckpt = torch.load(args.ckpt_path)
-        model.load_state_dict(ckpt['model_state_dict'], strict=True)
-    else:
-        raise RuntimeError("no use checkpoint")
+    ckpt_path = get_ckpt_path(log_fold_dir)
+    ckpt = torch.load(ckpt_path)
+    start_epoch = ckpt['epoch']
+    model.load_state_dict(ckpt['model_state_dict'], strict=True)
 
-    if args.num_classes == 1:
-        thres = [args.thres1]
-    elif args.num_classes == 2:
-        thres = [args.thres1, args.thres2]
+    if args_dict["num_classes"] == 1:
+        thres = [args_dict["thres1"]]
+    elif args_dict["num_classes"] == 2:
+        thres = [args_dict["thres1"], args_dict["thres2"]]
 
     pred_args = {"model": model, "pred_dir": pred_dir, "out_channels": out_channels, "device": device, "thres": thres, "pred_loader": pred_loader,
-                 "crop_size": (args.roi_z, args.roi_y, args.roi_x), "is_softmax": args.softmax, "overlap": args.overlap}
+                 "crop_size": (args_dict["roi_z"], args_dict["roi_y"], args_dict["roi_x"]), "is_softmax": args_dict["softmax"], "overlap": args_dict["overlap"]}
     predict(**pred_args)

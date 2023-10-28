@@ -30,6 +30,15 @@ def set_log_fold_dir(log_dir: str, log_folder: str, fold: int, is_lock: bool) ->
     return log_fold_dir
 
 
+def get_log_fold_dir(log_dir: str, log_folder: str, fold: int) -> str:
+    log_fold_dir = os.path.join(log_dir, log_folder, "fold{}".format(fold))
+
+    if not os.path.exists(log_fold_dir):
+        raise RuntimeError("Not Exists Log Dir: " + log_fold_dir)
+
+    return log_fold_dir
+
+
 def log_init(log_dir: str, fold: int, mode: str) -> logging.Logger:
     logger = logging.getLogger('logger_{}_fold{}'.format(mode, fold))
     logger.setLevel(logging.INFO)

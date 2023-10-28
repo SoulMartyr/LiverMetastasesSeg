@@ -76,7 +76,7 @@ def voe_torch(preds: torch.Tensor, gts: torch.Tensor, tgt_channel: int) -> float
     intersection = (pred * gt).sum()
     union = (pred + gt).sum()
 
-    voe = ((intersection + eps) / (union - intersection + eps)).item()
+    voe = 1 - ((intersection + eps) / (union - intersection + eps)).item()
     return voe
 
 

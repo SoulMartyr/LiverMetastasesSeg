@@ -1,9 +1,10 @@
 import os
 import math
+import yaml
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
-from typing import List, Tuple, Sequence, Union
+from typing import List, Tuple, Sequence, Union, Dict, Any
 import torch
 from torch import optim, nn
 from torch.nn import functional as F
@@ -33,7 +34,22 @@ def get_learning_rate(optimizer: optim.Optimizer) -> float:
     return lr
 
 
-def save_weight(ckpt_dir: str, epoch: int, model: nn.Module, optimizer: optim.Optimizer, scheduler: optim.lr_scheduler._LRScheduler):
+def get_args(log_fold_dir: str) -> Dict[str, Any]:
+    args_file_path = os.path.join(log_fold_dir, "exp_arg.yaml")
+    with open(args_file_path, 'r', encoding='utf-8') as f:
+        data = f.read()
+        args_dict = yaml.load(data, Loader=yaml.FullLoader)
+    return args_dict
+
+
+def get_ckpt_path(log_fold_dir: str) -> Dict[str, Any]:
+    ckpt_path = os.path.join(log_fold_dir, "model.pth")
+    if not os.path.exists(ckpt_path):
+        raise RuntimeError("no checkpoint")
+    return ckpt_path
+
+
+def save_weight(ckpt_dir: str, epoch: int, model: nn.Module, optimizer: optim.Optimizer, scheduler: optim.lr_scheduler._LRScheduler) -> None:
     if isinstance(model, nn.DataParallel):
         model = model.module
 
