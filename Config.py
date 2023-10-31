@@ -14,7 +14,7 @@ parser.add_argument('--fold',  nargs='+',  required=True, type=int,
 parser.add_argument('--num_classes', type=int, default=1,
                     help='classes num to segment')
 parser.add_argument(
-    '--norm', choices=['zscore', 'minmax'], default='zscore',  help='using zscore or minmax to normalize')
+    '--norm', choices=['zscore', 'minmax'], default='minmax',  help='using zscore or minmax to normalize')
 parser.add_argument(
     '--img_d', type=int, default=-1,  help='resize image depth, -1 means no change')
 parser.add_argument(

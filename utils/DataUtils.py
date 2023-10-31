@@ -187,12 +187,8 @@ class Dataset2D(Dataset):
         img_array = sitk.GetArrayFromImage(img)
         mask_array = sitk.GetArrayFromImage(mask)
 
-        assert len(np.unique(
-            mask_array).tolist()) == self.num_classes + 1, "numbers in mask dont equal to num classes"
-
-        nonzero_layers = np.nonzero(img_array.sum(axis=(1, 2)))[0]
-        img_array = img_array[nonzero_layers]
-        mask_array = mask_array[nonzero_layers]
+        img_array[img_array > 250] = 250
+        img_array[img_array < -200] = -200
 
         if self.norm == "zscore":
             img_array = z_score_norm_2d_numpy(img_array, nonzero=True)
@@ -262,12 +258,8 @@ class Dataset3D(Dataset):
         img_array = sitk.GetArrayFromImage(img)
         mask_array = sitk.GetArrayFromImage(mask)
 
-        assert len(np.unique(
-            mask_array).tolist()) == self.num_classes + 1, "numbers in mask dont equal to num classes"
-
-        nonzero_layers = np.nonzero(img_array.sum(axis=(1, 2)))[0]
-        img_array = img_array[nonzero_layers]
-        mask_array = mask_array[nonzero_layers]
+        img_array[img_array > 250] = 250
+        img_array[img_array < -200] = -200
 
         if self.norm == "zscore":
             img_array = z_score_norm_3d_numpy(img_array, nonzero=True)
@@ -327,12 +319,8 @@ class Dataset2D_Test(Dataset):
         img_array = sitk.GetArrayFromImage(img)
         mask_array = sitk.GetArrayFromImage(mask)
 
-        assert len(np.unique(
-            mask_array).tolist()) == self.num_classes + 1, "numbers in mask dont equal to num classes"
-
-        nonzero_layers = np.nonzero(img_array.sum(axis=(1, 2)))[0]
-        img_array = img_array[nonzero_layers]
-        mask_array = mask_array[nonzero_layers]
+        img_array[img_array > 250] = 250
+        img_array[img_array < -200] = -200
 
         if self.norm == "zscore":
             img_array = z_score_norm_2d_numpy(img_array, nonzero=True)
@@ -402,12 +390,8 @@ class Dataset3D_Test(Dataset):
         img_array = sitk.GetArrayFromImage(img)
         mask_array = sitk.GetArrayFromImage(mask)
 
-        assert len(np.unique(
-            mask_array).tolist()) == self.num_classes + 1, "numbers in mask dont equal to num classes"
-
-        nonzero_layers = np.nonzero(img_array.sum(axis=(1, 2)))[0]
-        img_array = img_array[nonzero_layers]
-        mask_array = mask_array[nonzero_layers]
+        img_array[img_array > 250] = 250
+        img_array[img_array < -200] = -200
 
         if self.norm == "zscore":
             img_array = z_score_norm_3d_numpy(img_array, nonzero=True)
@@ -465,6 +449,9 @@ class Dataset2D_Predict(Dataset):
 
         img_array = sitk.GetArrayFromImage(img)
 
+        img_array[img_array > 250] = 250
+        img_array[img_array < -200] = -200
+
         if self.norm == "zscore":
             img_array = z_score_norm_2d_numpy(img_array, nonzero=True)
         elif self.norm == "minmax":
@@ -504,6 +491,9 @@ class Dataset3D_Predict(Dataset):
         img = sitk.ReadImage(img_path, sitk.sitkInt32)
 
         img_array = sitk.GetArrayFromImage(img)
+
+        img_array[img_array > 250] = 250
+        img_array[img_array < -200] = -200
 
         if self.norm == "zscore":
             img_array = z_score_norm_3d_numpy(img_array, nonzero=True)
