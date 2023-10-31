@@ -81,7 +81,7 @@ parser.add_argument('--thres2', type=float, default=0.5,
 
 # metrics
 parser.add_argument('--metrics',  type=str,  nargs='+',
-                    default=["dice", "voe", "rvd", "asd"], help='metrics type')
+                    default=["dice_per_case", "dice_global", "voe_per_case", "voe_global", "rvd_per_case", "rvd_global", "asd"], help='metrics type')
 
 # predict
 parser.add_argument('--pred_dir', type=str, default='./predicts',

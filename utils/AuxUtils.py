@@ -78,7 +78,7 @@ class AvgOutput(object):
             self.sum = [x + y for x, y in zip(self.sum, x)]
         self.count += 1
 
-    def avg(self) -> float:
+    def avg(self) -> Union[float, List[float]]:
         if self.length == 0:
             return self.sum / self.count
         else:

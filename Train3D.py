@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 import Config
 from models import models_3d
 from utils.DataUtils import Dataset3D
-from utils.MetricsUtils import binary_torch, dice_torch
+from utils.MetricsUtils import Metrics
 from utils.LossUtils import dice_with_norm_binary, bce_loss, ce_loss, dice_loss
 from utils.LogUtils import get_month_and_day, set_log_fold_dir, save_args, log_init
 from utils.AuxUtils import AvgOutput, get_index, get_learning_rate, get_ckpt_path, save_weight, sliding_window_inference_3d
@@ -19,10 +19,17 @@ from utils.AuxUtils import AvgOutput, get_index, get_learning_rate, get_ckpt_pat
 def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, crop_size: Tuple[int], device: str,
           is_softmax: bool, overlap: float, thres: List[float], logger_valid: logging.Logger) -> float:
     logger_valid.info("Epoch: {}".format(epoch))
-    total_dice = [AvgOutput() for _ in range(0, num_classes)]
+
+    metrics_types = ["dice_per_case", "dice_global"]
+    metrics = Metrics(num_samples=len(valid_loader), num_classes=num_classes,
+                      is_softmax=is_softmax, thres=thres, metrics_types=metrics_types)
+
+    cmp_channel = -1
+    cmp_metric_type_idx = 0
 
     try:
         model.eval()
+
         for _, batch in enumerate(valid_loader):
             index = batch["index"][0]
             img = batch['img'].to(device)
@@ -31,36 +38,20 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: i
             with torch.no_grad():
                 pred = sliding_window_inference_3d(
                     img, crop_size, model, mask.size(), is_softmax, overlap)
-                pred = binary_torch(pred, is_softmax, thres)
-                pred, mask = pred.squeeze(0), mask.squeeze(0)
 
-            bacth_info = "Index:{} ".format(index)
+            metrics.info_per_case_metrics(
+                index, pred, mask, info_func=logger_valid.info)
 
-            channel_range = [i if not is_softmax else i +
-                             1 for i in range(0, num_classes)]
-
-            for idx, channel in enumerate(channel_range):
-                dice = dice_torch(pred, mask, channel)
-
-                if not is_softmax:
-                    bacth_info += "Thres:{} ".format(thres[idx])
-                bacth_info += "DICE{}: {:.4f} ".format(idx, dice)
-                total_dice[idx].add(dice)
-
-            logger_valid.info(bacth_info)
-
+        model.train()
     except Exception as e:
         logger_valid.error(e, exc_info=True)
         sys.exit()
 
-    total_info = "Mean: "
-    for idx in range(0, num_classes):
-        total_info += "DICE{}: {:.4f} ".format(idx, total_dice[idx].avg())
-    logger_valid.info(total_info)
+    mean_metrics_result = metrics.compute_mean_per_case_metrics()
+    metrics.info_mean_per_case_metrics(logger_valid.info)
+    metrics.info_global_metrics(logger_valid.info)
 
-    model.train()
-
-    return total_dice[-1].avg()
+    return mean_metrics_result[cmp_channel][cmp_metric_type_idx]
 
 
 def train(model: nn.Module, device: str,  thres: List[float], train_loader: DataLoader,  optimizer: optim.Optimizer, scheduler: optim.lr_scheduler._LRScheduler,  is_softmax: bool,

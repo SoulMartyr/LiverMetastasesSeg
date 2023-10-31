@@ -15,9 +15,8 @@ from utils.AuxUtils import AvgOutput, get_args, get_index, get_ckpt_path, slidin
 def test(test_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, crop_size: Tuple[int], device: str,
          is_softmax: bool, overlap: float, thres: List[float], metrics_types: List[str]) -> float:
     print("Epoch: {}".format(epoch))
-    total_metrics = [AvgOutput(length=len(metrics_types))
-                     for _ in range(0, num_classes)]
-    metrics = Metrics(metrics_types)
+    metrics = Metrics(num_samples=len(test_loader), num_classes=num_classes,
+                      is_softmax=is_softmax, thres=thres, metrics_types=metrics_types)
 
     model.eval()
     for _, batch in enumerate(test_loader):
@@ -29,32 +28,11 @@ def test(test_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int
         with torch.no_grad():
             pred = sliding_window_inference_3d(
                 img, crop_size, model, mask.size(), is_softmax, overlap)
-            pred = binary_torch(pred, is_softmax, thres)
-            pred, mask = pred.squeeze(0), mask.squeeze(0)
 
-        bacth_info = "Index:{} ".format(index)
+        metrics.info_per_case_metrics(index, pred, mask, spacing, print)
 
-        channel_range = [i if not is_softmax else i +
-                         1 for i in range(0, num_classes)]
-
-        for idx, channel in enumerate(channel_range):
-            metrics_info, metrics_result = metrics.compute_metrics(
-                pred, mask, channel, spacing)
-
-            if not is_softmax:
-                bacth_info += "Thres:{} ".format(thres[idx])
-            bacth_info += metrics_info
-            total_metrics[idx].add(metrics_result)
-
-        print(bacth_info)
-
-    total_info = "Mean: "
-    for idx in range(0, num_classes):
-        mean_metric = total_metrics[idx].avg()
-        for i, metrics_type in enumerate(metrics_types):
-            total_info += "{}{}: {:.4f} ".format(
-                metrics_type.upper(), idx, mean_metric[i])
-    print(total_info)
+    metrics.info_mean_per_case_metrics(print)
+    metrics.info_global_metrics(print)
 
 
 if __name__ == "__main__":
