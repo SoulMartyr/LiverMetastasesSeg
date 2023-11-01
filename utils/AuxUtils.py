@@ -71,10 +71,12 @@ class AvgOutput(object):
             self.sum = [0 for _ in range(length)]
         self.count = 0
 
-    def add(self, x: Union[float, List[float]]) -> None:
+    def add(self, x: Union[float, Sequence[float]]) -> None:
         if self.length == 0:
             self.sum += x
         else:
+            assert self.length == len(
+                x), "x length should equal to init length"
             self.sum = [x + y for x, y in zip(self.sum, x)]
         self.count += 1
 

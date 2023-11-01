@@ -55,6 +55,14 @@ parser.add_argument('--weight_decay', default=1e-5, type=float,
                     dest='weight_decay')
 parser.add_argument('--warm_restart', action='store_true',
                     help='use scheduler warm restarts with period of 30')
+parser.add_argument('--loss', type=str, nargs='+',
+                    default=["bce", "dice"], help='loss type')
+parser.add_argument('--class_weight', type=float, nargs='*',
+                    default=[], help='weight for each class')
+parser.add_argument('--background', action='store_true',
+                    help='whether include background')
+parser.add_argument('--loss_weight', type=float, nargs='*',
+                    default=[], help='weight for loss')
 parser.add_argument('--num_workers', default=8, type=int,
                     help='dataloader num workers (default: 8)')
 parser.add_argument('--valid_epoch', type=int, default=5,
@@ -74,10 +82,8 @@ parser.add_argument('--overlap', default=0.5, type=float,
                     help='valid window slide overlap (default: 0.5)')
 
 # threshold
-parser.add_argument('--thres1', type=float, default=0.5,
-                    help='threshold for judging first class(default: 0.5)')
-parser.add_argument('--thres2', type=float, default=0.5,
-                    help='threshold for judging second class(default: 0.5)')
+parser.add_argument('--thres', type=float, nargs='*',  default=[],
+                    help='threshold for judging class')
 
 # metrics
 parser.add_argument('--metrics',  type=str,  nargs='+',

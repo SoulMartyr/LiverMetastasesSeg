@@ -11,13 +11,13 @@ import Config
 from models import models_3d
 from utils.DataUtils import Dataset3D
 from utils.MetricsUtils import Metrics
-from utils.LossUtils import dice_with_norm_binary, bce_loss, ce_loss, dice_loss
+from utils.LossUtils import Loss, dice_with_norm_binary
 from utils.LogUtils import get_month_and_day, set_log_fold_dir, save_args, log_init
 from utils.AuxUtils import AvgOutput, get_index, get_learning_rate, get_ckpt_path, save_weight, sliding_window_inference_3d
 
 
-def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, crop_size: Tuple[int], device: str,
-          is_softmax: bool, overlap: float, thres: List[float], logger_valid: logging.Logger) -> float:
+def valid(valid_loader: DataLoader, model: nn.Module, device: str, epoch: int, num_classes: int,
+          crop_size: Tuple[int], is_softmax: bool, overlap: float, thres: List[float], logger_valid: logging.Logger) -> float:
     logger_valid.info("Epoch: {}".format(epoch))
 
     metrics_types = ["dice_per_case", "dice_global"]
@@ -54,12 +54,11 @@ def valid(valid_loader: DataLoader, model: nn.Module, epoch: int, num_classes: i
     return mean_metrics_result[cmp_channel][cmp_metric_type_idx]
 
 
-def train(model: nn.Module, device: str,  thres: List[float], train_loader: DataLoader,  optimizer: optim.Optimizer, scheduler: optim.lr_scheduler._LRScheduler,  is_softmax: bool,
-          epoch_num: int, weight: torch.Tensor, start_epoch: int, log_iter: int, valid_epoch: int, ckpt_dir: str, logger_train: logging.Logger, writer: SummaryWriter, valid_args: dict):
+def train(model: nn.Module, device: str, train_loader: DataLoader,  optimizer: optim.Optimizer, scheduler: optim.lr_scheduler._LRScheduler, loss: nn.Module, thres: List[float],
+          is_softmax: bool, epoch_num: int, start_epoch: int, log_iter: int, valid_epoch: int, ckpt_dir: str, logger_train: logging.Logger, writer: SummaryWriter, valid_args: dict) -> float:
     epoch = start_epoch
     best_result = 0.
-    ce_loss_iter = AvgOutput()
-    dice_loss_iter = AvgOutput()
+    loss_iter = AvgOutput(length=len(loss))
     core_dice_iter = AvgOutput()
 
     try:
@@ -80,16 +79,7 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
 
                 pred = model(img)
 
-                out_channels = pred.size(1)
-                if out_channels == 1:
-                    loss_ce = bce_loss(pred, mask)
-                else:
-                    loss_ce = ce_loss(pred, mask, weight=weight)
-
-                loss_dice = dice_loss(
-                    pred, mask, tgt_channels=[-1], is_softmax=is_softmax)
-
-                train_loss = loss_ce + loss_dice
+                train_loss, train_loss_dict = loss(pred, mask)
 
                 optimizer.zero_grad()
                 train_loss.backward()
@@ -98,18 +88,24 @@ def train(model: nn.Module, device: str,  thres: List[float], train_loader: Data
                 writer.add_scalar(tag="loss/train", scalar_value=train_loss.item(),
                                   global_step=epoch * len(train_loader) + iteration)
 
-                ce_loss_iter.add(loss_ce.item())
-                dice_loss_iter.add(loss_dice.item())
+                loss_iter.add(train_loss_dict.values())
                 core_dice_iter.add(dice_with_norm_binary(
                     pred, mask, -1, threshold=thres, is_softmax=is_softmax))
 
                 if iteration % log_iter == 0 and iteration != 0:
-                    iter_info = "Iteration:{} Learning rate:{:.5f} CE Loss:{:.4f}, Dice Loss:{:.4f} Core Dice:{:.4f}".format(
-                        iteration, get_learning_rate(optimizer), ce_loss_iter.avg(), dice_loss_iter.avg(), core_dice_iter.avg())
+                    iter_info = "Iteration:{} Learning rate:{:.5f} - ".format(
+                        iteration, get_learning_rate(optimizer))
+
+                    avg_loss_iter = loss_iter.avg()
+                    for i, loss_type in enumerate(train_loss_dict.keys()):
+                        iter_info += "{}: {:.4f} ".format(
+                            loss_type.upper(), avg_loss_iter[i])
+
+                    iter_info += "- Core Dice: {:.4f} ".format(
+                        core_dice_iter.avg())
                     logger_train.info(iter_info)
 
-                    ce_loss_iter.clear()
-                    dice_loss_iter.clear()
+                    loss_iter.clear()
                     core_dice_iter.clear()
 
             epoch += 1
@@ -208,19 +204,23 @@ if __name__ == "__main__":
 
         logger_train.info("Load Model\Optimizer\Scheduler Success")
 
-        if args.num_classes == 1:
-            thres = [args.thres1]
-            weight = None
-        elif args.num_classes == 2:
-            thres = [args.thres1, args.thres2]
-            if args.softmax:
-                weight = torch.tensor([0.078, 0.065, 0.857]).to(device)
-            else:
-                weight = torch.tensor([0.143, 0.857]).to(device)
+        class_weight = None if len(
+            args.class_weight) == 0 else torch.tensor(args.class_weight).to(device)
+        loss_weight = [1. for _ in range(len(args.loss))] if len(
+            args.loss_weight) == 0 else args.loss_weight
+        loss_weight = torch.tensor(loss_weight).to(device)
 
-        valid_args = {"model": model, "device": device, "thres": thres, "valid_loader": valid_loader, "num_classes": args.num_classes, "epoch": start_epoch,
-                      "crop_size": (args.roi_z, args.roi_y, args.roi_x), "logger_valid": logger_valid, "is_softmax": args.softmax, "overlap": args.overlap}
-        train_args = {"model": model, "device": device, "thres": thres, "train_loader": train_loader, "optimizer": optimizer, "scheduler": scheduler, "is_softmax": args.softmax, "epoch_num": args.epoch_num, "weight": weight,
+        loss = Loss(args.num_classes, args.background, args.softmax,
+                    args.loss, class_weight, loss_weight)
+
+        thres = [0.5 for _ in range(args.num_classes)] if len(
+            args.loss_weight) == 0 else args.thres
+        assert len(
+            thres) == args.num_classes, "thres length should equal to num classes"
+
+        valid_args = {"model": model, "device": device, "valid_loader": valid_loader, "epoch": start_epoch, "num_classes": args.num_classes, "thres": thres,
+                      "is_softmax": args.softmax, "crop_size": (args.roi_z, args.roi_y, args.roi_x), "overlap": args.overlap, "logger_valid": logger_valid}
+        train_args = {"model": model, "device": device, "train_loader": train_loader, "optimizer": optimizer, "scheduler": scheduler, "loss": loss, "thres": thres, "is_softmax": args.softmax, "epoch_num": args.epoch_num,
                       "start_epoch": start_epoch, "log_iter": args.log_iter, "valid_epoch": args.valid_epoch, "ckpt_dir": log_fold_dir, "logger_train": logger_train, "writer": writer, "valid_args": valid_args}
         best_result = train(**train_args)
         logger_valid.info("Best Dice: {}".format(str(best_result)))

@@ -1,6 +1,71 @@
 import torch
 import torch.nn.functional as F
-from typing import Union, List, Tuple
+from torch.nn import Module
+from typing import Union, List, Tuple, Dict
+
+from .AuxUtils import AvgOutput
+
+
+class Loss(Module):
+    def __init__(self, num_classes: int, include_background: bool,  is_softmax: bool, loss_types: List[str] = None, class_weight: Union[List[float], None] = None, loss_weight: Union[List[float], None] = None):
+        super(Loss, self).__init__()
+
+        self.loss_func_dict = {"mse": mse_loss,
+                               "bce": bce_loss,
+                               "ce": ce_loss,
+                               "dice": dice_loss,
+                               "gdice": generalized_dice_loss
+                               }
+
+        if num_classes == 1:
+            assert "ce" not in loss_types, "one num classes should use bce"
+        else:
+            assert "bce" not in loss_types, "more than one num classes should use ce"
+
+        for loss_type in loss_types:
+            if loss_type not in self.loss_func_dict:
+                raise ValueError("error loss type:{}".format(loss_type))
+        self.loss_types = loss_types
+
+        start_channel = 0 if include_background else 1
+        end_channel = num_classes + 1 if is_softmax else num_classes
+        self.channel_range = [i for i in range(
+            start_channel, end_channel)]
+
+        assert len(loss_types) == len(loss_weight)
+
+        self.num_classes = num_classes
+        self.include_background = include_background
+        self.is_softmax = is_softmax
+        self.class_weight = class_weight
+        self.loss_weight = loss_weight
+
+    def __len__(self) -> int:
+        return len(self.loss_types)
+
+    def forward(self, pred, gt) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        loss_list = []
+
+        for loss_type in self.loss_types:
+            if loss_type == "bce" or loss_type == "mse":
+                loss_list.append(self.loss_func_dict[loss_type](pred, gt))
+            elif loss_type == "ce":
+                loss_list.append(self.loss_func_dict[loss_type](
+                    pred, gt, self.class_weight))
+            elif loss_type == "dice":
+                loss_list.append(self.loss_func_dict[loss_type](
+                    pred, gt, self.channel_range, self.is_softmax, self.class_weight))
+            elif loss_type == "gdice":
+                loss_list.append(self.loss_func_dict[loss_type](
+                    pred, gt, self.channel_range, self.is_softmax, self.class_weight))
+
+        loss = torch.sum(torch.stack(loss_list) * self.loss_weight)
+        loss_dict = dict(zip(self.loss_types, loss_list))
+        return loss, loss_dict
+
+
+def mse_loss(preds: torch.Tensor, gts: torch.Tensor) -> torch.Tensor:
+    return F.mse_loss(preds, gts, reduction='mean')
 
 
 def bce_loss(preds: torch.Tensor, gts: torch.Tensor) -> torch.Tensor:
@@ -11,7 +76,8 @@ def ce_loss(preds: torch.Tensor, gts: torch.Tensor, weight: torch.Tensor) -> tor
     return F.cross_entropy(preds, gts, weight, reduction="mean")
 
 
-def dice_loss(preds: torch.Tensor, gts: torch.Tensor, tgt_channels: List[int] = [0], is_softmax: bool = False, weights: torch.Tensor = None, in_detail: bool = False) -> Union[Tuple[List[torch.FloatTensor], torch.FloatTensor], torch.FloatTensor]:
+def dice_loss(preds: torch.Tensor, gts: torch.Tensor, tgt_channels: List[int] = [0], is_softmax: bool = False,
+              class_weights: Union[torch.Tensor, None] = None, in_detail: bool = False) -> Union[Tuple[List[torch.FloatTensor], torch.FloatTensor], torch.FloatTensor]:
     if is_softmax:
         preds = torch.softmax(preds, dim=1)
     else:
@@ -32,18 +98,18 @@ def dice_loss(preds: torch.Tensor, gts: torch.Tensor, tgt_channels: List[int] = 
 
     assert preds.size() == gts.size()
 
-    assert weights is None or weights.size(0) == preds.size(0)
-
     intersection = (preds * gts).sum(-1)
 
     union = (preds + gts).sum(-1)
 
     loss_channel = (1 - (2. * intersection + eps) / (union + eps)).sum(-1) / B
 
-    if weights is not None:
-        loss_channel *= weights
+    if class_weights is None:
+        loss_channel /= num_tgt_channels
+    else:
+        loss_channel *= class_weights[tgt_channels]
 
-    loss = loss_channel.sum(-1) / num_tgt_channels
+    loss = loss_channel.sum(-1)
 
     if in_detail:
         loss_list = [loss_channel[i].item() for i in range(num_tgt_channels)]
@@ -52,7 +118,7 @@ def dice_loss(preds: torch.Tensor, gts: torch.Tensor, tgt_channels: List[int] = 
         return loss
 
 
-def generalized_dice_loss(preds: torch.Tensor, gts: torch.Tensor, tgt_channels: List[int] = [0], is_softmax: bool = False,
+def generalized_dice_loss(preds: torch.Tensor, gts: torch.Tensor, tgt_channels: List[int] = [0], is_softmax: bool = False, class_weights: Union[torch.Tensor, None] = None,
                           weight_type: str = 'square', in_detail: bool = False) -> Union[Tuple[List[torch.FloatTensor], torch.FloatTensor], torch.FloatTensor]:
     if is_softmax:
         preds = torch.softmax(preds, dim=1)
@@ -78,20 +144,26 @@ def generalized_dice_loss(preds: torch.Tensor, gts: torch.Tensor, tgt_channels: 
     target_sum = gts.sum(-1)
 
     if weight_type == 'square':
-        class_weights = 1. / (target_sum * target_sum + eps)
+        weights = 1. / (target_sum * target_sum + eps)
     elif weight_type == 'identity':
-        class_weights = 1. / (target_sum + eps)
+        weights = 1. / (target_sum + eps)
     elif weight_type == 'sqrt':
-        class_weights = 1. / (torch.sqrt(target_sum) + eps)
+        weights = 1. / (torch.sqrt(target_sum) + eps)
     else:
         raise ValueError('Check out the weight_type :', weight_type)
 
-    intersection = (preds * gts).sum(-1) * class_weights
-    union = (preds + gts).sum(-1) * class_weights + eps
+    intersection = (preds * gts).sum(-1) * weights
+    union = (preds + gts).sum(-1) * weights + eps
 
     loss_channel = (1 - 2. * (2. * intersection + eps) /
                     (union + eps)).sum(-1) / B
-    loss = loss_channel.sum() / num_tgt_channels
+
+    if class_weights is None:
+        loss_channel /= num_tgt_channels
+    else:
+        loss_channel *= class_weights[tgt_channels]
+
+    loss = loss_channel.sum(-1)
 
     if in_detail:
         loss_list = [loss_channel[i].item() for i in range(num_tgt_channels)]
@@ -128,7 +200,7 @@ def dice_with_norm_binary(preds: torch.Tensor, gts: torch.Tensor, tgt_channel: i
     eps = 1e-5
     B = preds.size(0)
     dice = 0.
-    
+
     for i in range(B):
 
         pred = preds[i, tgt_channel].flatten()
@@ -138,7 +210,7 @@ def dice_with_norm_binary(preds: torch.Tensor, gts: torch.Tensor, tgt_channel: i
         union = (pred + gt).sum() + eps
 
         dice += (2. * intersection / union).item()
-        
+
     return dice / B
 
 
