@@ -44,10 +44,7 @@ if __name__ == "__main__":
     assert len(args.fold) == 1, "predict only support 1 fold once"
     fold = args.fold
 
-    cur_month, cur_day = get_month_and_day()
-    file_dir = str(cur_month) + str(cur_day) + "_" + args.log_folder
-
-    pred_dir = set_pred_dir(args.pred_dir, file_dir, fold[0])
+    pred_dir = set_pred_dir(args.pred_dir, args.log_folder, fold[0])
 
     log_fold_dir = get_log_fold_dir(args.log_dir, args.log_folder, fold[0])
 
@@ -84,10 +81,10 @@ if __name__ == "__main__":
     start_epoch = ckpt['epoch']
     model.load_state_dict(ckpt['model_state_dict'], strict=True)
 
-    if args_dict["num_classes"] == 1:
-        thres = [args_dict["thres1"]]
-    elif args_dict["num_classes"] == 2:
-        thres = [args_dict["thres1"], args_dict["thres2"]]
+    thres = [0.5 for _ in range(args_dict["num_classes"])] if len(
+        args_dict["thres"]) == 0 else args_dict["thres"]
+    assert len(
+        thres) == args.num_classes, "thres length should equal to num classes"
 
     pred_args = {"model": model, "pred_dir": pred_dir, "out_channels": out_channels, "device": device, "thres": thres, "pred_loader": pred_loader,
                  "crop_size": (args_dict["roi_z"], args_dict["roi_y"], args_dict["roi_x"]), "is_softmax": args_dict["softmax"]}

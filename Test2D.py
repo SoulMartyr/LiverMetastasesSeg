@@ -77,10 +77,10 @@ if __name__ == "__main__":
     start_epoch = ckpt['epoch']
     model.load_state_dict(ckpt['model_state_dict'], strict=True)
 
-    if args_dict["num_classes"] == 1:
-        thres = [args_dict["thres1"]]
-    elif args_dict["num_classes"] == 2:
-        thres = [args_dict["thres1"], args_dict["thres2"]]
+    thres = [0.5 for _ in range(args_dict["num_classes"])] if len(
+        args_dict["thres"]) == 0 else args_dict["thres"]
+    assert len(
+        thres) == args.num_classes, "thres length should equal to num classes"
 
     test_args = {"model": model, "device": device, "thres": thres, "test_loader": test_loader, "num_classes": args_dict["num_classes"], "epoch": start_epoch,
                  "crop_size": (args_dict["roi_z"], args_dict["roi_y"], args_dict["roi_x"]),  "is_softmax": args_dict["softmax"], "metrics_types": args.metrics}

@@ -218,7 +218,7 @@ if __name__ == "__main__":
                     args.loss, class_weight, loss_weight)
 
         thres = [0.5 for _ in range(args.num_classes)] if len(
-            args.loss_weight) == 0 else args.thres
+            args.thres) == 0 else args.thres
         assert len(
             thres) == args.num_classes, "thres length should equal to num classes"
 
