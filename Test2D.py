@@ -13,7 +13,7 @@ from utils.AuxUtils import get_args, get_index, get_ckpt_path, sliding_window_in
 
 
 def test(test_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int, crop_size: Tuple[int], device: str,
-         is_softmax: bool, thres: List[float], metrics_types: List[str]) -> float:
+         is_softmax: bool, thres: List[float], overlap: float, metrics_types: List[str]) -> float:
     print("Epoch: {}".format(epoch))
     metrics = Metrics(num_samples=len(test_loader), num_classes=num_classes,
                       is_softmax=is_softmax, thres=thres, metrics_types=metrics_types)
@@ -27,7 +27,7 @@ def test(test_loader: DataLoader, model: nn.Module, epoch: int, num_classes: int
 
         with torch.no_grad():
             pred = sliding_window_inference_2d(
-                img, crop_size, model, mask.size(), is_softmax)
+                img, crop_size, model, mask.size(), is_softmax, overlap)
 
         metrics.info_per_case_metrics(index, pred, mask, spacing, print)
 
@@ -83,5 +83,5 @@ if __name__ == "__main__":
         thres) == args.num_classes, "thres length should equal to num classes"
 
     test_args = {"model": model, "device": device, "thres": thres, "test_loader": test_loader, "num_classes": args_dict["num_classes"], "epoch": start_epoch,
-                 "crop_size": (args_dict["roi_z"], args_dict["roi_y"], args_dict["roi_x"]),  "is_softmax": args_dict["softmax"], "metrics_types": args.metrics}
+                 "crop_size": (args_dict["roi_z"], args_dict["roi_y"], args_dict["roi_x"]),  "is_softmax": args_dict["softmax"], "overlap": args_dict["overlap"], "metrics_types": args.metrics}
     test(**test_args)

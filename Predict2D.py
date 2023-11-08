@@ -15,7 +15,7 @@ from utils.AuxUtils import get_args, get_ckpt_path, predict_merge_channel_torch,
 
 
 def predict(pred_loader: DataLoader, model: nn.Module, pred_dir: str, out_channels: int, crop_size: Tuple[int], device: str,
-            is_softmax: bool, thres: List[float]) -> float:
+            is_softmax: bool, overlap: float, thres: List[float]) -> float:
     model.eval()
     for _, batch in enumerate(tqdm(pred_loader)):
         img = batch['img'].to(device)
@@ -26,7 +26,7 @@ def predict(pred_loader: DataLoader, model: nn.Module, pred_dir: str, out_channe
 
         with torch.no_grad():
             pred = sliding_window_inference_2d(
-                img, crop_size, model, outputs_size, is_softmax)
+                img, crop_size, model, outputs_size, is_softmax, overlap)
 
         pred = binary_torch(pred, is_softmax, thres)
         mask_tensor = predict_merge_channel_torch(pred.squeeze(0), is_softmax)
@@ -87,5 +87,5 @@ if __name__ == "__main__":
         thres) == args.num_classes, "thres length should equal to num classes"
 
     pred_args = {"model": model, "pred_dir": pred_dir, "out_channels": out_channels, "device": device, "thres": thres, "pred_loader": pred_loader,
-                 "crop_size": (args_dict["roi_z"], args_dict["roi_y"], args_dict["roi_x"]), "is_softmax": args_dict["softmax"]}
+                 "crop_size": (args_dict["roi_z"], args_dict["roi_y"], args_dict["roi_x"]), "is_softmax": args_dict["softmax"], "overlap": args_dict["overlap"]}
     predict(**pred_args)

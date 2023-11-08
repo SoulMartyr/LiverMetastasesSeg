@@ -16,8 +16,8 @@ from utils.LogUtils import get_month_and_day, set_log_fold_dir, save_args, log_i
 from utils.AuxUtils import AvgOutput, get_index, get_learning_rate, get_ckpt_path, save_weight, sliding_window_inference_2d
 
 
-def valid(valid_loader: DataLoader, model: nn.Module,  device: str, epoch: int, num_classes: int,
-          is_softmax: bool, thres: List[float], crop_size: Tuple[int], logger_valid: logging.Logger) -> float:
+def valid(valid_loader: DataLoader, model: nn.Module, device: str, epoch: int, num_classes: int,
+          crop_size: Tuple[int], is_softmax: bool, overlap: float, thres: List[float], logger_valid: logging.Logger) -> float:
     logger_valid.info("Epoch: {}".format(epoch))
 
     metrics_types = ["dice_per_case", "dice_global"]
@@ -37,7 +37,7 @@ def valid(valid_loader: DataLoader, model: nn.Module,  device: str, epoch: int, 
 
             with torch.no_grad():
                 pred = sliding_window_inference_2d(
-                    img, crop_size, model, mask.size(), is_softmax)
+                    img, crop_size, model, mask.size(), is_softmax, overlap)
 
             metrics.info_per_case_metrics(
                 index, pred, mask, info_func=logger_valid.info)
@@ -221,8 +221,8 @@ if __name__ == "__main__":
         assert len(
             thres) == args.num_classes, "thres length should equal to num classes"
 
-        valid_args = {"model": model, "device": device, "valid_loader": valid_loader, "epoch": start_epoch, "num_classes": args.num_classes,
-                      "thres": thres, "is_softmax": args.softmax, "crop_size": (args.roi_z, args.roi_y, args.roi_x), "logger_valid": logger_valid}
+        valid_args = {"model": model, "device": device, "valid_loader": valid_loader, "epoch": start_epoch, "num_classes": args.num_classes, "thres": thres,
+                      "is_softmax": args.softmax, "crop_size": (args.roi_z, args.roi_y, args.roi_x), "overlap": args.overlap, "logger_valid": logger_valid}
         train_args = {"model": model, "device": device, "train_loader": train_loader, "optimizer": optimizer, "scheduler": scheduler, "loss": loss, "thres": thres, "is_softmax": args.softmax, "epoch_num": args.epoch_num,
                       "start_epoch": start_epoch, "log_iter": args.log_iter, "valid_epoch": args.valid_epoch, "ckpt_dir": log_fold_dir, "logger_train": logger_train, "writer": writer, "valid_args": valid_args}
         best_result = train(**train_args)

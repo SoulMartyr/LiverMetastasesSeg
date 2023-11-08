@@ -18,9 +18,9 @@ parser.add_argument(
 parser.add_argument(
     '--img_d', type=int, default=-1,  help='resize image depth, -1 means no change')
 parser.add_argument(
-    '--img_h', type=int, default=224,  help='resize image height, -1 means no change')
+    '--img_h', type=int, default=-1,  help='resize image height, -1 means no change')
 parser.add_argument(
-    '--img_w', type=int, default=224,  help='resize image width, -1 means no change')
+    '--img_w', type=int, default=-1,  help='resize image width, -1 means no change')
 parser.add_argument("--roi_z", default=32, type=int,
                     help="roi size in x direction")
 parser.add_argument("--roi_y", default=224, type=int,

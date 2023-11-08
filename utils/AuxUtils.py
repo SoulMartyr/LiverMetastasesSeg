@@ -104,7 +104,31 @@ def set_pred_dir(pred_dir: str, file_dir: str, fold: int) -> str:
     return pred_dir
 
 
-def _get_scan_interval(
+def _get_scan_interval_2d(
+    image_size: Sequence[int], roi_size: Sequence[int], num_spatial_dims: int, overlap: float
+) -> Tuple[int, ...]:
+    """
+    Compute scan interval according to the image size, roi size and overlap.
+    Scan interval will be `int((1 - overlap) * roi_size)`, if interval is 0,
+    use 1 instead to make sure sliding window works.
+
+    """
+    if len(image_size) != num_spatial_dims:
+        raise ValueError("image coord different from spatial dims.")
+    if len(roi_size) != num_spatial_dims:
+        raise ValueError("roi coord different from spatial dims.")
+
+    scan_interval = []
+    for i in range(num_spatial_dims):
+        if roi_size[i] == image_size[i] or i == 0:
+            scan_interval.append(int(roi_size[i]))
+        else:
+            interval = int(roi_size[i] * (1 - overlap))
+            scan_interval.append(interval if interval > 0 else 1)
+    return tuple(scan_interval)
+
+
+def _get_scan_interval_3d(
     image_size: Sequence[int], roi_size: Sequence[int], num_spatial_dims: int, overlap: float
 ) -> Tuple[int, ...]:
     """
@@ -128,7 +152,7 @@ def _get_scan_interval(
     return tuple(scan_interval)
 
 
-def sliding_window_inference_2d(inputs: torch.Tensor, crop_size: Tuple[int],  model: nn.Module, outputs_size: torch.Size, is_softmax: bool) -> torch.Tensor:
+def sliding_window_inference_2d(inputs: torch.Tensor, crop_size: Tuple[int],  model: nn.Module, outputs_size: torch.Size, is_softmax: bool, overlap: float) -> torch.Tensor:
     num_spatial_dims = len(inputs.shape) - 2
 
     # determine image spatial size and batch size
@@ -145,8 +169,8 @@ def sliding_window_inference_2d(inputs: torch.Tensor, crop_size: Tuple[int],  mo
         pad_size.extend([half, diff - half])
     inputs = F.pad(inputs, pad=pad_size, mode="constant", value=0.)
 
-    scan_interval = _get_scan_interval(
-        image_size, crop_size, num_spatial_dims, 0)
+    scan_interval = _get_scan_interval_2d(
+        image_size, crop_size, num_spatial_dims, overlap)
 
     scan_num = [math.ceil((image_size[i] - crop_size[i]) /
                           scan_interval[i]) + 1 for i in range(num_spatial_dims)]
@@ -198,7 +222,7 @@ def sliding_window_inference_3d(inputs: torch.Tensor, crop_size: Tuple[int],  mo
         pad_size.extend([half, diff - half])
     inputs = F.pad(inputs, pad=pad_size, mode="constant", value=0.)
 
-    scan_interval = _get_scan_interval(
+    scan_interval = _get_scan_interval_3d(
         image_size, crop_size, num_spatial_dims, overlap)
 
     scan_num = [math.ceil((image_size[i] - crop_size[i]) /
