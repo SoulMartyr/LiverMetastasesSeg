@@ -37,6 +37,18 @@ def random_crop_numpy(img_array: np.ndarray, mask_array: np.ndarray, crop_size: 
     return img_array[crop_bot_z:crop_top_z, crop_bot_y:crop_top_y, crop_bot_x:crop_top_x], mask_array[crop_bot_z:crop_top_z, crop_bot_y:crop_top_y, crop_bot_x:crop_top_x]
 
 
+def change_virtual_3d_numpy(array: np.ndarray) -> np.ndarray:
+    v3d_arr = np.zeros((3, *array.shape))
+
+    v3d_arr[0, 1:] = array[:-1].copy()
+    v3d_arr[1] = array.copy()
+    v3d_arr[2, :-1] = array[1:].copy()
+
+    v3d_arr[0, 0] = array[0].copy()
+    v3d_arr[2, -1] = array[-1].copy()
+    return v3d_arr
+
+
 def resize_dhw_numpy(array: np.ndarray, order: int, dhw: tuple) -> np.ndarray:
     dhw = tuple([array.shape[i] if dhw[i] == -1 else dhw[i] for i in range(3)])
 
@@ -96,10 +108,10 @@ def z_score_norm_2d_numpy(array: np.ndarray, nonzero: bool = True) -> np.ndarray
 
 
 def ont_hot_mask_numpy(array: np.ndarray, num_classes: int, is_softmax: bool) -> np.ndarray:
-    assert is_softmax or ((not is_softmax) and num_classes == 1)
+    # assert is_softmax or ((not is_softmax) and num_classes == 1)
 
     if not is_softmax:
-        one_hot = [(array == i).astype(
+        one_hot = [(array >= i).astype(
             np.uint8) for i in range(1, num_classes + 1)]
     else:
         one_hot = [(array == i).astype(
@@ -140,8 +152,8 @@ def augmentation(img_array: np.ndarray, mask_array: np.ndarray) -> Tuple[np.ndar
 
 
 class Dataset2D(nn.Module):
-    def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
-                 crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
+    def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1, crop_size: Tuple[int] = (32, 224, 224),
+                 norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_v3d: bool = False, is_flip: bool = False) -> None:
         super(Dataset2D, self).__init__()
         assert num_classes == 1 or num_classes == 2, "Num Classes should be 1 or 2"
         assert norm in ["zscore",
@@ -158,6 +170,7 @@ class Dataset2D(nn.Module):
         self.dhw = dhw
         self.is_keyframe = is_keyframe
         self.is_softmax = is_softmax
+        self.is_v3d = is_v3d
         self.is_flip = is_flip
 
     def __len__(self) -> int:
@@ -195,16 +208,21 @@ class Dataset2D(nn.Module):
             if self.is_flip:
                 img_array, mask_array = augmentation(img_array, mask_array)
 
+        if self.is_v3d:
+            img_array = change_virtual_3d_numpy(img_array)
+        else:
+            img_array = np.repeat(np.expand_dims(img_array, axis=0), 3, axis=0)
+
         mask_array = ont_hot_mask_numpy(
             mask_array, num_classes=self.num_classes, is_softmax=self.is_softmax)
 
         img_tensor = torch.FloatTensor(img_array.copy())
         mask_tensor = torch.FloatTensor(mask_array.copy())
+
         if self.is_train:
-            img_tensor = img_tensor.unsqueeze(1)
+            img_tensor = img_tensor.permute(1, 0, 2, 3)
             mask_tensor = mask_tensor.permute(1, 0, 2, 3)
-        else:
-            img_tensor = img_tensor.unsqueeze(0)
+
         return {"index": self.index_list[index].split('.')[0], "img": img_tensor, "mask": mask_tensor}
 
 
@@ -274,8 +292,8 @@ class Dataset3D(nn.Module):
 
 
 class Dataset2D_Test(nn.Module):
-    def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
-                 crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
+    def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1, crop_size: Tuple[int] = (32, 224, 224),
+                 norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_v3d: bool = False, is_flip: bool = False) -> None:
         super(Dataset2D_Test, self).__init__()
         assert num_classes == 1 or num_classes == 2, "Num Classes should be 1 or 2"
         assert norm in ["zscore",
@@ -292,6 +310,7 @@ class Dataset2D_Test(nn.Module):
         self.dhw = dhw
         self.is_keyframe = is_keyframe
         self.is_softmax = is_softmax
+        self.is_v3d = is_v3d
         self.is_flip = is_flip
 
     def __len__(self) -> int:
@@ -329,16 +348,21 @@ class Dataset2D_Test(nn.Module):
             if self.is_flip:
                 img_array, mask_array = augmentation(img_array, mask_array)
 
+        if self.is_v3d:
+            img_array = change_virtual_3d_numpy(img_array)
+        else:
+            img_array = np.repeat(np.expand_dims(img_array, axis=0), 3, axis=0)
+
         mask_array = ont_hot_mask_numpy(
             mask_array, num_classes=self.num_classes, is_softmax=self.is_softmax)
 
         img_tensor = torch.FloatTensor(img_array.copy())
         mask_tensor = torch.FloatTensor(mask_array.copy())
+
         if self.is_train:
-            img_tensor = img_tensor.unsqueeze(1)
+            img_tensor = img_tensor.permute(1, 0, 2, 3)
             mask_tensor = mask_tensor.permute(1, 0, 2, 3)
-        else:
-            img_tensor = img_tensor.unsqueeze(0)
+
         return {"index": self.index_list[index].split('.')[0], "img": img_tensor, "mask": mask_tensor, "spacing": img.GetSpacing()}
 
 
@@ -418,7 +442,7 @@ def keep_tuple_collate_fn(batch):
 
 
 class Dataset2D_Predict(nn.Module):
-    def __init__(self, data_dir: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224)) -> None:
+    def __init__(self, data_dir: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_v3d: bool = False) -> None:
         super(Dataset2D_Predict, self).__init__()
         assert norm in ["zscore",
                         "minmax"], "norm should be \'zscore\' or \'minmax\'"
@@ -428,6 +452,7 @@ class Dataset2D_Predict(nn.Module):
         self.index_list = index_list
         self.norm = norm
         self.dhw = dhw
+        self.is_v3d = is_v3d
 
     def __len__(self) -> int:
         return len(self.index_list)
@@ -446,7 +471,12 @@ class Dataset2D_Predict(nn.Module):
 
         img_array = resize_dhw_numpy(img_array, order=3, dhw=self.dhw)
 
-        img_tensor = torch.FloatTensor(img_array.copy()).unsqueeze(0)
+        if self.is_v3d:
+            img_array = change_virtual_3d_numpy(img_array)
+        else:
+            img_array = np.repeat(np.expand_dims(img_array, axis=0), 3, axis=0)
+
+        img_tensor = torch.FloatTensor(img_array.copy())
 
         return {"file": self.index_list[index], "img_path": img_path, "img": img_tensor}
 
@@ -490,7 +520,7 @@ if __name__ == "__main__":
     import pandas as pd
     from torch.utils.data import DataLoader
     fold = 0
-    index_path = "./data/index_V.csv"
+    index_path = "./data/CRLM/index_V.csv"
 
     index_df = pd.read_csv(index_path, index_col=0)
     train_patients = []
@@ -499,9 +529,9 @@ if __name__ == "__main__":
             train_patients.extend(index_df.loc[i, "index"].strip().split(" "))
     test_patients = index_df.loc[fold, "index"].strip().split(" ")
 
-    data_dir = 'data/resection_V'
+    data_dir = 'data/CRLM/resection_V'
     train_dataset = Dataset2D(data_dir=data_dir, image_dir="images", mask_dir="liver_tumor_masks",
-                              index_list=train_patients, is_train=True, num_classes=2, crop_size=(32, 224, 224), norm="zscore", dhw=(-1, 224, 224), is_keyframe=True, is_softmax=True, is_flip=False)
+                              index_list=train_patients, is_train=True, num_classes=2, crop_size=(32, 224, 224), norm="zscore", dhw=(-1, 224, 224), is_keyframe=True, is_softmax=True, is_v3d=True, is_flip=False)
 
     dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
     print("len", len(dataloader))

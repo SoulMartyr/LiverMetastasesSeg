@@ -32,6 +32,8 @@ parser.add_argument(
 parser.add_argument(
     '--softmax', action='store_true', help='using softmax to process pred and mask ')
 parser.add_argument(
+    '--v3d', action='store_true', help='using virtual 3D to change 2D')
+parser.add_argument(
     '--flip', action='store_true', help='flip data')
 
 # train
@@ -76,8 +78,6 @@ parser.add_argument('--lock', action='store_true',
                     help='lock log dir to avoid accidental deletion')
 parser.add_argument('--use_ckpt', action='store_true',
                     help='use checkpoint to initial weight')
-parser.add_argument('--ckpt_path', type=str,
-                    default='./checkpoints/default/model.pth', help="pretrain checkpoint path")
 parser.add_argument('--overlap', default=0.5, type=float,
                     help='valid window slide overlap (default: 0.5)')
 

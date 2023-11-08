@@ -77,9 +77,8 @@ def train(model: nn.Module, device: str, train_loader: DataLoader,  optimizer: o
                 img = batch['img'].to(device)
                 mask = batch['mask'].to(device)
 
-                img_keep_dims, mask_keep_dims = img.size()[2:], mask.size()[2:]
-                img, mask = img.view(-1, *
-                                     img_keep_dims), mask.view(-1, *mask_keep_dims)
+                img, mask = img.view(-1, *img.size()
+                                     [2:]), mask.view(-1, *mask.size()[2:])
 
                 pred = model(img)
 
@@ -145,9 +144,9 @@ if __name__ == "__main__":
         valid_index = get_index(args.index_path, fold=[fold])
 
         train_dataset_args = {"data_dir": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": train_index, "is_train": True, "num_classes": args.num_classes,
-                              "crop_size": (args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_flip": args.flip}
+                              "crop_size": (args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_v3d": args.v3d, "is_flip": args.flip}
         valid_dataset_args = {"data_dir": args.data_dir, "image_dir": args.image_dir, "mask_dir": args.mask_dir, "index_list": valid_index, "is_train": False, "num_classes": args.num_classes,
-                              "crop_size": (args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_flip": False}
+                              "crop_size": (args.roi_z, args.roi_y, args.roi_x), "norm": args.norm, "dhw": (args.img_d, args.img_h, args.img_w), "is_keyframe": args.keyframe, "is_softmax": args.softmax, "is_v3d": args.v3d, "is_flip": False}
 
         train_dataset = Dataset2D(**train_dataset_args)
         valid_dataset = Dataset2D(**valid_dataset_args)

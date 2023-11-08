@@ -49,7 +49,7 @@ if __name__ == "__main__":
     test_index = get_index(args_dict["index_path"], fold=fold)
 
     test_dataset_args = {"data_dir": args_dict["data_dir"], "image_dir": args_dict["image_dir"], "mask_dir": args_dict["mask_dir"], "index_list": test_index, "is_train": False, "num_classes": args_dict["num_classes"],
-                         "crop_size": (args_dict["roi_z"], args_dict["roi_y"], args_dict["roi_x"]), "norm": args_dict["norm"], "dhw": (args_dict["img_d"], args_dict["img_h"], args_dict["img_w"]), "is_keyframe": args_dict["keyframe"], "is_softmax": args_dict["softmax"], "is_flip": False}
+                         "crop_size": (args_dict["roi_z"], args_dict["roi_y"], args_dict["roi_x"]), "norm": args_dict["norm"], "dhw": (args_dict["img_d"], args_dict["img_h"], args_dict["img_w"]), "is_keyframe": args_dict["keyframe"], "is_softmax": args_dict["softmax"], "is_v3d": args_dict["v3d"], "is_flip": False}
 
     test_dataset = Dataset2D_Test(**test_dataset_args)
 

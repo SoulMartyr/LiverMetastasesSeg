@@ -53,7 +53,7 @@ if __name__ == "__main__":
     pred_index = get_index(args_dict["index_path"], fold=fold)
 
     pred_dataset_args = {"data_dir": args_dict["data_dir"], "image_dir": args_dict["image_dir"],
-                         "index_list": pred_index,  "norm": args_dict["norm"], "dhw": (args_dict["img_d"], args_dict["img_h"], args_dict["img_w"])}
+                         "index_list": pred_index,  "norm": args_dict["norm"], "dhw": (args_dict["img_d"], args_dict["img_h"], args_dict["img_w"]), "is_v3d": args_dict["v3d"]}
 
     pred_dataset = Dataset2D_Predict(**pred_dataset_args)
 
