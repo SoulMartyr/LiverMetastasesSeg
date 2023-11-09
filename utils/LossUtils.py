@@ -17,11 +17,6 @@ class Loss(Module):
                                "gdice": generalized_dice_loss
                                }
 
-        if num_classes == 1:
-            assert "ce" not in loss_types, "one num classes should use bce"
-        else:
-            assert "bce" not in loss_types, "more than one num classes should use ce"
-
         for loss_type in loss_types:
             if loss_type not in self.loss_func_dict:
                 raise ValueError("error loss type:{}".format(loss_type))

@@ -178,22 +178,21 @@ def dice_per_case_torch(pred: torch.Tensor, gt: torch.Tensor, tgt_channel: int) 
 def dice_global_torch(preds: List[torch.Tensor], gts: List[torch.Tensor], tgt_channel: int) -> float:
     assert isinstance(preds, list) and isinstance(
         gts, list), "preds and gts should be list of tensor"
-
-    pred = torch.cat(preds, dim=1)
-    gt = torch.cat(gts, dim=1)
-
-    assert pred.dim() == 4 and gt.dim(
+    assert preds[0].dim() == 4 and gts[0].dim(
     ) == 4, "pred and gt shape should be [C,D,H,W]"
-    assert torch.unique(pred).numel() <= 2 and torch.unique(
-        gt).numel() <= 2, "pred and gt unique number should be less than 2"
+    assert torch.unique(preds[0]).numel() <= 2 and torch.unique(
+        gts[0]).numel() <= 2, "pred and gt unique number should be less than 2"
+
+    preds = [pred[tgt_channel].flatten() for pred in preds]
+    gts = [gt[tgt_channel].flatten() for gt in gts]
 
     eps = 1e-5
 
-    pred = pred[tgt_channel].flatten()
-    gt = gt[tgt_channel].flatten()
+    intersections = [(pred * gt).sum() for pred, gt in zip(preds, gts)]
+    unions = [(pred + gt).sum() for pred, gt in zip(preds, gts)]
 
-    intersection = (pred * gt).sum()
-    union = (pred + gt).sum()
+    intersection = sum(intersections)
+    union = sum(unions)
 
     dice = ((2 * intersection + eps) / (union + eps)).item()
     return dice
@@ -220,22 +219,21 @@ def voe_per_case_torch(pred: torch.Tensor, gt: torch.Tensor, tgt_channel: int) -
 def voe_global_torch(preds: List[torch.Tensor], gts: List[torch.Tensor], tgt_channel: int) -> float:
     assert isinstance(preds, list) and isinstance(
         gts, list), "preds and gts should be list of tensor"
-
-    pred = torch.cat(preds, dim=1)
-    gt = torch.cat(gts, dim=1)
-
-    assert pred.dim() == 4 and gt.dim(
+    assert preds[0].dim() == 4 and gts[0].dim(
     ) == 4, "pred and gt shape should be [C,D,H,W]"
-    assert torch.unique(pred).numel() <= 2 and torch.unique(
-        gt).numel() <= 2, "pred and gt unique number should be less than 2"
+    assert torch.unique(preds[0]).numel() <= 2 and torch.unique(
+        gts[0]).numel() <= 2, "pred and gt unique number should be less than 2"
+
+    preds = [pred[tgt_channel].flatten() for pred in preds]
+    gts = [gt[tgt_channel].flatten() for gt in gts]
 
     eps = 1e-5
 
-    pred = pred[tgt_channel].flatten()
-    gt = gt[tgt_channel].flatten()
+    intersections = [(pred * gt).sum() for pred, gt in zip(preds, gts)]
+    unions = [(pred + gt).sum() for pred, gt in zip(preds, gts)]
 
-    intersection = (pred * gt).sum()
-    union = (pred + gt).sum()
+    intersection = sum(intersections)
+    union = sum(unions)
 
     voe = 1 - ((intersection + eps) / (union - intersection + eps)).item()
     return voe
@@ -263,22 +261,18 @@ def rvd_per_case_torch(pred: torch.Tensor, gt: torch.Tensor, tgt_channel: int) -
 def rvd_global_torch(preds: List[torch.Tensor], gts: List[torch.Tensor], tgt_channel: int) -> float:
     assert isinstance(preds, list) and isinstance(
         gts, list), "preds and gts should be list of tensor"
-
-    pred = torch.cat(preds, dim=1)
-    gt = torch.cat(gts, dim=1)
-
-    assert pred.dim() == 4 and gt.dim(
+    assert preds[0].dim() == 4 and gts[0].dim(
     ) == 4, "pred and gt shape should be [C,D,H,W]"
-    assert torch.unique(pred).numel() <= 2 and torch.unique(
-        gt).numel() <= 2, "pred and gt unique number should be less than 2"
+    assert torch.unique(preds[0]).numel() <= 2 and torch.unique(
+        gts[0]).numel() <= 2, "pred and gt unique number should be less than 2"
+
+    preds = [pred[tgt_channel].flatten() for pred in preds]
+    gts = [gt[tgt_channel].flatten() for gt in gts]
 
     eps = 1e-5
 
-    pred = pred[tgt_channel].flatten()
-    gt = gt[tgt_channel].flatten()
-
-    volume_pred = pred.sum()
-    volume_gt = gt.sum()
+    volume_pred = sum(preds)
+    volume_gt = sum(gts)
 
     rvd = (torch.abs(volume_pred - volume_gt + eps) /
            (volume_gt + eps)).item()
