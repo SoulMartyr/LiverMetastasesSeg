@@ -7,6 +7,7 @@ import collections
 import torch
 from typing import Tuple, Dict, Any
 from scipy import ndimage
+from torch.utils.data import Dataset
 from torch.utils.data.dataloader import default_collate
 
 
@@ -151,7 +152,7 @@ def augmentation(img_array: np.ndarray, mask_array: np.ndarray) -> Tuple[np.ndar
     return img_array, mask_array
 
 
-class Dataset2D(nn.Module):
+class Dataset2D(Dataset):
     def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1, crop_size: Tuple[int] = (32, 224, 224),
                  norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_v3d: bool = False, is_flip: bool = False) -> None:
         super(Dataset2D, self).__init__()
@@ -226,7 +227,7 @@ class Dataset2D(nn.Module):
         return {"index": self.index_list[index].split('.')[0], "img": img_tensor, "mask": mask_tensor}
 
 
-class Dataset3D(nn.Module):
+class Dataset3D(Dataset):
     def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
                  crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
         super(Dataset3D, self).__init__()
@@ -291,7 +292,7 @@ class Dataset3D(nn.Module):
         return {"index": self.index_list[index].split('.')[0], "img": img_tensor, "mask": mask_tensor}
 
 
-class Dataset2D_Test(nn.Module):
+class Dataset2D_Test(Dataset):
     def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1, crop_size: Tuple[int] = (32, 224, 224),
                  norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_v3d: bool = False, is_flip: bool = False) -> None:
         super(Dataset2D_Test, self).__init__()
@@ -366,7 +367,7 @@ class Dataset2D_Test(nn.Module):
         return {"index": self.index_list[index].split('.')[0], "img": img_tensor, "mask": mask_tensor, "spacing": img.GetSpacing()}
 
 
-class Dataset3D_Test(nn.Module):
+class Dataset3D_Test(Dataset):
     def __init__(self, data_dir: str,  image_dir: str, mask_dir: str, index_list: list, is_train: bool = True, num_classes: int = 1,
                  crop_size: Tuple[int] = (32, 224, 224), norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_keyframe: bool = True, is_softmax: bool = False, is_flip: bool = False) -> None:
         super(Dataset3D_Test, self).__init__()
@@ -441,7 +442,7 @@ def keep_tuple_collate_fn(batch):
         return default_collate(batch)
 
 
-class Dataset2D_Predict(nn.Module):
+class Dataset2D_Predict(Dataset):
     def __init__(self, data_dir: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224), is_v3d: bool = False) -> None:
         super(Dataset2D_Predict, self).__init__()
         assert norm in ["zscore",
@@ -481,7 +482,7 @@ class Dataset2D_Predict(nn.Module):
         return {"file": self.index_list[index], "img_path": img_path, "img": img_tensor}
 
 
-class Dataset3D_Predict(nn.Module):
+class Dataset3D_Predict(Dataset):
     def __init__(self, data_dir: str,  image_dir: str, index_list: list, norm: str = "zscore", dhw: Tuple[int] = (-1, 224, 224)) -> None:
         super(Dataset3D_Predict, self).__init__()
 
