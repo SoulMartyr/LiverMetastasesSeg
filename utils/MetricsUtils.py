@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from scipy.ndimage import morphology, zoom
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Union, Callable
 
 from .LossUtils import sigmoid_binary_torch, softmax_binary_torch
 from .AuxUtils import AvgOutput
@@ -338,18 +338,20 @@ def get_mask_edges(pred: np.ndarray, gt: np.ndarray, crop: bool = True) -> Tuple
     return edges_pred, edges_gt
 
 
-def get_surface_distance(src: np.ndarray, dest: np.ndarray, distance_metric: str = "euclidean") -> np.ndarray:
+def get_surface_distance(src: np.ndarray, dest: np.ndarray, sampling: Union[float, List[float]], distance_metric: str = "euclidean") -> np.ndarray:
     if not np.any(dest):
+        dest = resize_mask_spacing_numpy(dest, sampling)
         dist = np.inf * np.ones_like(dest)
     else:
         if not np.any(src):
+            dest = resize_mask_spacing_numpy(dest, sampling)
             dist = np.inf * np.ones_like(dest)
             return np.asarray(dist[dest])
         if distance_metric == "euclidean":
-            dist = morphology.distance_transform_edt(~dest)
+            dist = morphology.distance_transform_edt(~dest, sampling=sampling)
         elif distance_metric in {"chessboard", "taxicab"}:
             dist = morphology.distance_transform_cdt(
-                ~dest, metric=distance_metric)
+                ~dest, sampling=sampling, metric=distance_metric)
         else:
             raise ValueError(
                 f"distance_metric {distance_metric} is not implemented.")
@@ -366,15 +368,12 @@ def asd_torch(pred: torch.Tensor, gt: torch.Tensor, tgt_channel: int, spacing: T
     pred = pred[tgt_channel].detach().cpu().numpy()
     gt = gt[tgt_channel].detach().cpu().numpy()
 
-    pred = resize_mask_spacing_numpy(pred, spacing)
-    gt = resize_mask_spacing_numpy(gt, spacing)
-
     edges_pred, edges_gt = get_mask_edges(pred, gt)
 
     surface_distance_pred2gt = get_surface_distance(
-        edges_pred, edges_gt, distance_metric=distance_metric)
+        edges_pred, edges_gt, sampling=spacing, distance_metric=distance_metric)
     surface_distance_gt2pred = get_surface_distance(
-        edges_gt, edges_pred, distance_metric=distance_metric)
+        edges_gt, edges_pred, sampling=spacing,  distance_metric=distance_metric)
     surface_distance = np.concatenate(
         [surface_distance_pred2gt, surface_distance_gt2pred])
 
@@ -393,14 +392,12 @@ def msd_torch(pred: torch.Tensor, gt: torch.Tensor, tgt_channel: int, spacing: T
     pred = pred[tgt_channel].detach().cpu().numpy()
     gt = gt[tgt_channel].detach().cpu().numpy()
 
-    pred = resize_mask_spacing_numpy(pred, spacing)
-    gt = resize_mask_spacing_numpy(gt, spacing)
-
     edges_pred, edges_gt = get_mask_edges(pred, gt)
+
     surface_distance_pred2gt = get_surface_distance(
-        edges_pred, edges_gt, distance_metric=distance_metric)
+        edges_pred, edges_gt, sampling=spacing, distance_metric=distance_metric)
     surface_distance_gt2pred = get_surface_distance(
-        edges_gt, edges_pred, distance_metric=distance_metric)
+        edges_gt, edges_pred, sampling=spacing, distance_metric=distance_metric)
 
     if surface_distance_pred2gt.shape == (0,) or surface_distance_gt2pred.shape == (0,):
         return np.nan
@@ -417,14 +414,12 @@ def rmsd_torch(pred: torch.Tensor, gt: torch.Tensor, tgt_channel: int, spacing: 
     pred = pred[tgt_channel].detach().cpu().numpy()
     gt = gt[tgt_channel].detach().cpu().numpy()
 
-    pred = resize_mask_spacing_numpy(pred, spacing)
-    gt = resize_mask_spacing_numpy(gt, spacing)
-
     edges_pred, edges_gt = get_mask_edges(pred, gt)
+
     surface_distance_pred2gt = get_surface_distance(
-        edges_pred, edges_gt, distance_metric=distance_metric)
+        edges_pred, edges_gt, sampling=spacing, distance_metric=distance_metric)
     surface_distance_gt2pred = get_surface_distance(
-        edges_gt, edges_pred, distance_metric=distance_metric)
+        edges_gt, edges_pred, sampling=spacing, distance_metric=distance_metric)
     surface_distance = np.concatenate(
         [surface_distance_pred2gt * surface_distance_pred2gt, surface_distance_gt2pred * surface_distance_gt2pred])
 
@@ -434,23 +429,45 @@ def rmsd_torch(pred: torch.Tensor, gt: torch.Tensor, tgt_channel: int, spacing: 
         return np.sqrt(surface_distance.mean())
 
 
+def hd95_torch(pred: torch.Tensor, gt: torch.Tensor, tgt_channel: int, spacing: Tuple[float], distance_metric: str = "euclidean") -> float:
+    assert pred.dim() == 4 and gt.dim(
+    ) == 4, "pred and gt shape should be [C,D,H,W]"
+    assert torch.unique(pred).numel() <= 2 and torch.unique(
+        gt).numel() <= 2, "pred and gt unique number should be less than 2"
+
+    pred = pred[tgt_channel].detach().cpu().numpy()
+    gt = gt[tgt_channel].detach().cpu().numpy()
+
+    edges_pred, edges_gt = get_mask_edges(pred, gt)
+
+    surface_distance_pred2gt = get_surface_distance(
+        edges_pred, edges_gt, sampling=spacing, distance_metric=distance_metric)
+    surface_distance_gt2pred = get_surface_distance(
+        edges_gt, edges_pred, sampling=spacing, distance_metric=distance_metric)
+
+    hd95 = np.percentile(
+        np.hstack((surface_distance_pred2gt, surface_distance_gt2pred)), 95)
+    return hd95
+
+
 if __name__ == "__main__":
     A = torch.tensor(
         [[[
-            [0, 0, 1, 1, 1],
-            [1, 0, 0, 1, 1],
-            [0, 0, 1, 1, 0],
-            [0, 0, 0, 0, 1],
+            [0, 1, 1, 1, 1],
+            [1, 1, 0, 1, 1],
+            [0, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1],
             [0, 0, 0, 0, 0],
         ]]]
     )
     B = torch.tensor(
         [[[
-            [0, 0, 1, 1, 1],
-            [0, 0, 1, 1, 1],
-            [0, 0, 1, 1, 1],
             [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 1, 1, 0, 0],
+            [0, 1, 1, 0, 0],
             [0, 0, 0, 0, 0],
         ]]],
     )
-    a = get_surface_distance(A[0, 0].numpy(), B[0, 0].numpy())
+    a = hd95_torch(A, B, 0, (1, 1, 1))
+    print(a)
