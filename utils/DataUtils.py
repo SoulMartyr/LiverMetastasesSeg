@@ -90,7 +90,7 @@ def min_max_norm_2d_numpy(array: np.ndarray) -> np.ndarray:
     arr_min = array.min(axis=(1, 2), keepdims=True)
     arr_max = array.max(axis=(1, 2), keepdims=True)
 
-    return (array - arr_min) / (arr_max - arr_min)
+    return np.divide((array - arr_min), (arr_max - arr_min))
 
 
 def z_score_norm_2d_numpy(array: np.ndarray, nonzero: bool = True) -> np.ndarray:
@@ -212,7 +212,7 @@ class Dataset2D(Dataset):
         if self.is_v3d:
             img_array = change_virtual_3d_numpy(img_array)
         else:
-            img_array = np.repeat(np.expand_dims(img_array, axis=0), 3, axis=0)
+            img_array = np.expand_dims(img_array, axis=0)
 
         mask_array = ont_hot_mask_numpy(
             mask_array, num_classes=self.num_classes, is_softmax=self.is_softmax)
@@ -352,7 +352,7 @@ class Dataset2D_Test(Dataset):
         if self.is_v3d:
             img_array = change_virtual_3d_numpy(img_array)
         else:
-            img_array = np.repeat(np.expand_dims(img_array, axis=0), 3, axis=0)
+            img_array = np.expand_dims(img_array, axis=0)
 
         mask_array = ont_hot_mask_numpy(
             mask_array, num_classes=self.num_classes, is_softmax=self.is_softmax)
@@ -475,7 +475,7 @@ class Dataset2D_Predict(Dataset):
         if self.is_v3d:
             img_array = change_virtual_3d_numpy(img_array)
         else:
-            img_array = np.repeat(np.expand_dims(img_array, axis=0), 3, axis=0)
+            img_array = np.expand_dims(img_array, axis=0)
 
         img_tensor = torch.FloatTensor(img_array.copy())
 

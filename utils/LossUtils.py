@@ -22,7 +22,7 @@ class Loss(Module):
                 raise ValueError("error loss type:{}".format(loss_type))
         self.loss_types = loss_types
 
-        start_channel = 0 if include_background else 1
+        start_channel = 0 if include_background or not is_softmax else 1
         end_channel = num_classes + 1 if is_softmax else num_classes
         self.channel_range = [i for i in range(
             start_channel, end_channel)]
@@ -150,7 +150,7 @@ def generalized_dice_loss(preds: torch.Tensor, gts: torch.Tensor, tgt_channels: 
     intersection = (preds * gts).sum(-1) * weights
     union = (preds + gts).sum(-1) * weights + eps
 
-    loss_channel = (1 - 2. * (2. * intersection + eps) /
+    loss_channel = (1 - (2. * intersection + eps) /
                     (union + eps)).sum(-1) / B
 
     if class_weights is None:

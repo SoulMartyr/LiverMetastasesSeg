@@ -80,7 +80,7 @@ if __name__ == "__main__":
     thres = [0.5 for _ in range(args_dict["num_classes"])] if len(
         args_dict["thres"]) == 0 else args_dict["thres"]
     assert len(
-        thres) == args.num_classes, "thres length should equal to num classes"
+        thres) == args_dict["num_classes"], "thres length should equal to num classes"
 
     test_args = {"model": model, "device": device, "thres": thres, "test_loader": test_loader, "num_classes": args_dict["num_classes"], "epoch": start_epoch,
                  "crop_size": (args_dict["roi_z"], args_dict["roi_y"], args_dict["roi_x"]),  "is_softmax": args_dict["softmax"], "overlap": args_dict["overlap"], "metrics_types": args.metrics}

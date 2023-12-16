@@ -128,7 +128,7 @@ if __name__ == "__main__":
             args.log_folder
 
         log_fold_dir = set_log_fold_dir(
-            args.log_dir, log_folder, fold, is_lock=args.lock)
+            args.log_dir, log_folder, fold, is_lock=args.lock, use_ckpt=args.use_ckpt)
         save_args(args, log_fold_dir)
         logger_train = log_init(log_fold_dir, fold, mode="train")
         logger_valid = log_init(log_fold_dir, fold, mode="valid")

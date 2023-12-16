@@ -266,8 +266,8 @@ def rvd_global_torch(preds: List[torch.Tensor], gts: List[torch.Tensor], tgt_cha
     assert torch.unique(preds[0]).numel() <= 2 and torch.unique(
         gts[0]).numel() <= 2, "pred and gt unique number should be less than 2"
 
-    preds = [pred[tgt_channel].flatten() for pred in preds]
-    gts = [gt[tgt_channel].flatten() for gt in gts]
+    preds = [pred[tgt_channel].sum() for pred in preds]
+    gts = [gt[tgt_channel].sum() for gt in gts]
 
     eps = 1e-5
 
